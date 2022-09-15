@@ -1,0 +1,23 @@
+\documentclass[11pt]{article}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage[portrait, tmargin=.6in, lmargin=.6in, rmargin=.6in]{geometry}
+
+% Header Information
+\title{\textbf{\VAR{data.report_name}}}
+\author{{\VAR{data.organization_name}}}
+\date{\today}
+
+
+\begin{document}
+\maketitle
+\newpage
+
+\section { Detailed Transaction Listing }
+% This is a regular LaTeX comment
+\BLOCK{ for key, value in data1.items() }
+\subsection{\VAR{names[key]}}
+    \VAR{value}
+\BLOCK{ endfor }
+\end{document}
