@@ -4,6 +4,7 @@ import tomli
 
 def add_hline(latex: str, index: int) -> str:
     """
+    For report creation and formatting
     Adds a horizontal `index` lines before the last line of the table
 
     Args:
@@ -17,6 +18,7 @@ def add_hline(latex: str, index: int) -> str:
 
 def column_filler(df: DataFrame) -> list:
     """
+    For report creation and formatting
     Fills blank columns with blank strings for use with loc[]
 
     Args:
