@@ -1,3 +1,5 @@
+# Use this text template in the Notes field of individual Accounts
+# in GnuCash. The TOML elements will be parsed by the report generator
 [Depreciation]
 Cost = 420.00
 Sec_179 = 50.00

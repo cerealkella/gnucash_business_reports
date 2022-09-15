@@ -1,12 +1,12 @@
 import pandas as pd
 import pd_db_wrangler
-import tomli
 from tabulate import tabulate
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from dateutil.relativedelta import relativedelta
 from uuid import uuid4
 from .config import get_datadir, get_gnucash_file_path
+from .helpers import get_keys, parse_toml
 
 
 class GnuCash_Data_Analysis:
@@ -21,7 +21,7 @@ class GnuCash_Data_Analysis:
         self.pdw = pd_db_wrangler.Pandas_DB_Wrangler()
         self.pdw.set_connection_string(get_gnucash_file_path(), db_type="sqlite")
 
-    def get_all_accounts(self):
+    def get_all_accounts(self) -> pd.DataFrame:
         """
         Optionally Override cached mode
 
@@ -42,7 +42,7 @@ class GnuCash_Data_Analysis:
         id_name_dict = dict(zip(all_accounts["guid"], all_accounts["name"]))
         parent_dict = dict(zip(all_accounts["guid"], all_accounts["parent_guid"]))
 
-        def find_parent(x):
+        def find_parent(x) -> str:
             """Function to recursively determine parents for accounts"""
             value = parent_dict.get(x, None)
             if value is None:
@@ -53,7 +53,7 @@ class GnuCash_Data_Analysis:
                     return "" + find_parent(value)
                 return str(id_name_dict.get(value)) + ">" + find_parent(value)
 
-        def get_third_level(x):
+        def get_third_level(x) -> str:
             """For the Finpack report, we want the 3rd Level of acct categories"""
             parents = x.split(">")
             level_count = len(parents)
@@ -81,7 +81,7 @@ class GnuCash_Data_Analysis:
 
         return all_accounts
 
-    def get_prices(self):
+    def get_commodity_prices(self) -> pd.DataFrame:
         if self.CACHED_MODE:
             query = "SELECT * FROM prices"
             prices = self.pdw.df_fetch(query, parse_dates=["date"])
@@ -92,7 +92,26 @@ class GnuCash_Data_Analysis:
             )
         return prices
 
+    def get_depreciation_accounts(self, df: pd.DataFrame) -> pd.DataFrame:
+        depreciation_accounts = df[
+            df["account_notes"]
+            .str.startswith("[Depreciation]")
+            .replace("\\n", "\n", regex=True)
+            == True
+        ]
+        depr_keys = get_keys(
+            depreciation_accounts["account_notes"][0], "Depreciation"
+        )  # this assumes the first account will have all the keys we need
+
+        # populate depreciation columns into dataframe using keys from get_keys
+        for key in depr_keys:
+            depreciation_accounts[key] = depreciation_accounts["account_notes"].apply(
+                lambda x: parse_toml(x, "Depreciation", key)
+            )
+        return depreciation_accounts
+
 
 gda = GnuCash_Data_Analysis()
 all_accounts = gda.get_all_accounts()
-print(all_accounts)
+depr = gda.get_depreciation_accounts(all_accounts)
+print(depr)
