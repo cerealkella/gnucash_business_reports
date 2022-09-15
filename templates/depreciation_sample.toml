@@ -1,0 +1,7 @@
+[Depreciation]
+Cost = 420.00
+Sec_179 = 50.00
+Depreciation_Type = "Other"
+Method = "MO S/L"
+Years = 5
+Date_in_Service = 2020-12-27T08:00:00.000000-06:00
