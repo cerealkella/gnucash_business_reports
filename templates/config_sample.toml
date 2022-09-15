@@ -1,0 +1,6 @@
+# Place this in the application directory created by this module
+# name it config.toml
+[Organization]
+business_name="Old McDonald's Farm"
+[GNUCash]
+file_path="/home/user/thebooks.gnucash"
