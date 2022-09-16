@@ -15,6 +15,7 @@ class GnuCash_Data_Analysis:
         self.data_directory = get_datadir()
         # Set Reporting year constant
         self.year = 2022
+        self.all_accounts = None
         # Suppress warnings, format numbers
         pd.options.mode.chained_assignment = None  # default='warn'
         pd.set_option("display.float_format", lambda x: "%.2f" % x)
@@ -28,58 +29,62 @@ class GnuCash_Data_Analysis:
         True = use CSV files
         False = use live data from database
         """
-        if self.CACHED_MODE:
-            all_accounts = pd.read_csv(
-                f"{self.data_directory}/ALL_ACCOUNTS.csv", dtype={"code": object}
-            )
-        else:
-            all_accounts = self.pdw.df_fetch(
-                self.pdw.read_sql_file("sql/all_accounts.sql")
-            )
-            all_accounts.to_csv(f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False)
-
-        all_account_types = all_accounts["account_type"].unique().tolist()
-        id_name_dict = dict(zip(all_accounts["guid"], all_accounts["name"]))
-        parent_dict = dict(zip(all_accounts["guid"], all_accounts["parent_guid"]))
-
-        def find_parent(x) -> str:
-            """Function to recursively determine parents for accounts"""
-            value = parent_dict.get(x, None)
-            if value is None:
-                return ""
+        if self.all_accounts is None:
+            if self.CACHED_MODE:
+                all_accounts = pd.read_csv(
+                    f"{self.data_directory}/ALL_ACCOUNTS.csv", dtype={"code": object}
+                )
             else:
-                # In case there is a id without name.
-                if id_name_dict.get(value, None) is None:
-                    return "" + find_parent(value)
-                return str(id_name_dict.get(value)) + ">" + find_parent(value)
+                all_accounts = self.pdw.df_fetch(
+                    self.pdw.read_sql_file("sql/all_accounts.sql")
+                )
+                all_accounts.to_csv(
+                    f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False
+                )
 
-        def get_third_level(x) -> str:
-            """For the Finpack report, we want the 3rd Level of acct categories"""
-            parents = x.split(">")
-            level_count = len(parents)
-            if level_count > 2:
-                return str(parents[level_count - 3])
-            else:
-                return ""
+            all_account_types = all_accounts["account_type"].unique().tolist()
+            id_name_dict = dict(zip(all_accounts["guid"], all_accounts["name"]))
+            parent_dict = dict(zip(all_accounts["guid"], all_accounts["parent_guid"]))
 
-        all_accounts["parent_accounts"] = (
-            all_accounts["guid"].apply(lambda x: find_parent(x)).str.rstrip(">")
-        )
-        all_accounts["finpack_account"] = all_accounts["parent_accounts"].apply(
-            lambda x: get_third_level(x)
-        )
-        all_accounts.loc[
-            all_accounts["finpack_account"] == "", "finpack_account"
-        ] = all_accounts["name"]
+            def find_parent(x) -> str:
+                """Function to recursively determine parents for accounts"""
+                value = parent_dict.get(x, None)
+                if value is None:
+                    return ""
+                else:
+                    # In case there is a id without name.
+                    if id_name_dict.get(value, None) is None:
+                        return "" + find_parent(value)
+                    return str(id_name_dict.get(value)) + ">" + find_parent(value)
 
-        all_accounts.set_index("guid", drop=True, inplace=True)
+            def get_third_level(x) -> str:
+                """For the Finpack report, we want the 3rd Level of acct categories"""
+                parents = x.split(">")
+                level_count = len(parents)
+                if level_count > 2:
+                    return str(parents[level_count - 3])
+                else:
+                    return ""
 
-        if not self.CACHED_MODE:
-            # Create CSV with Parental Tree for reporting
-            all_accounts.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
-            # Create CSV with Prices which is used for valuation
+            all_accounts["parent_accounts"] = (
+                all_accounts["guid"].apply(lambda x: find_parent(x)).str.rstrip(">")
+            )
+            all_accounts["finpack_account"] = all_accounts["parent_accounts"].apply(
+                lambda x: get_third_level(x)
+            )
+            all_accounts.loc[
+                all_accounts["finpack_account"] == "", "finpack_account"
+            ] = all_accounts["name"]
 
-        return all_accounts
+            all_accounts.set_index("guid", drop=True, inplace=True)
+
+            if not self.CACHED_MODE:
+                # Create CSV with Parental Tree for reporting
+                all_accounts.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
+                # Create CSV with Prices which is used for valuation
+
+            self.all_accounts = all_accounts
+        return self.all_accounts
 
     def get_commodity_prices(self) -> pd.DataFrame:
         if self.CACHED_MODE:
@@ -261,8 +266,86 @@ class GnuCash_Data_Analysis:
 
         return build_dataframe(get_depreciation_accounts(df))
 
+    def fetch_transactions(
+        self, acct_types: list = [], inverse_multiplier: bool = True
+    ) -> pd.DataFrame:
+        def get_transactions_from_db(guids=[], inverse_multiplier=True) -> pd.DataFrame:
+            """
+            Pass a list of Account GUIDs and whether to pull by Source Accounts for cash accounting
+            or main account for accrual
+            When passing True, it will need to multiply the account totals by -1 to invert
+            """
+            if inverse_multiplier == True:
+                multiplier = "* -1"
+                inner_where = """
+                where
+                    accounts.guid in ('{}')
+                """
+                main_where = """ where a.guid not in ('{}')"""
+            else:
+                multiplier = "* 1"
+                inner_where = """
+                where
+                    accounts.guid not in ('{}')
+                """
+                main_where = """ where a.guid in ('{}')"""
+
+            """
+            This gives us everything for each acct, not filtered by
+            year, allowing us to get current balances for sanity checking
+            """
+            sql = self.pdw.read_sql_file("sql/transactions_master.sql")
+
+            for guid in guids:
+                query = sql.format(
+                    inner_where.format(guid), main_where.format(guid), multiplier
+                )
+                tx = self.pdw.df_fetch(
+                    query, parse_dates=["post_date", "enter_date", "reconcile_date"]
+                )
+                if guid == guids[0]:
+                    all_tx = tx
+                else:
+                    all_tx = pd.concat([all_tx, tx])
+            return all_tx
+
+        def get_guid_list(acct_types=[]):
+            """2020-10-25 Refactored function to make it more generic"""
+            all_accounts = self.get_all_accounts()
+            filtered_accounts = all_accounts[
+                all_accounts["account_type"].isin(acct_types)
+            ]
+            return filtered_accounts.index.tolist()
+
+        if self.CACHED_MODE:
+            for account in acct_types:
+                csv_import = pd.read_csv(
+                    f"{self.data_directory}/{account}.csv",
+                    dtype={
+                        "account_code": object,
+                        "src_code": object,
+                        "tx_num": object,
+                    },
+                    parse_dates=["post_date", "enter_date", "reconcile_date"],
+                )
+                if account == acct_types[0]:
+                    tx = csv_import
+                else:
+                    tx = pd.concat([tx, csv_import])
+        else:
+            for account in acct_types:
+                guids = get_guid_list([account])
+                csv_export = get_transactions_from_db(guids, inverse_multiplier)
+                csv_export.to_csv(f"{self.data_directory}/{account}.csv", index=False)
+                if account == acct_types[0]:
+                    tx = csv_export
+                else:
+                    tx = pd.concat([tx, csv_export])
+        return tx
+
 
 gda = GnuCash_Data_Analysis()
-all_accounts = gda.get_all_accounts()
-depr = gda.build_depreciation_dataframe(all_accounts)
-print(depr)
+# all_accounts = gda.get_all_accounts()
+# depr = gda.build_depreciation_dataframe(all_accounts)
+txns = gda.fetch_transactions(["ASSET"], True)
+print(txns)
