@@ -82,7 +82,6 @@ class GnuCash_Data_Analysis:
                 # Create CSV with Parental Tree for reporting
                 all_accounts.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
                 # Create CSV with Prices which is used for valuation
-
             self.all_accounts = all_accounts
         return self.all_accounts
 
@@ -311,9 +310,9 @@ class GnuCash_Data_Analysis:
 
         def get_guid_list(acct_types=[]):
             """2020-10-25 Refactored function to make it more generic"""
-            all_accounts = self.get_all_accounts()
-            filtered_accounts = all_accounts[
-                all_accounts["account_type"].isin(acct_types)
+            self.get_all_accounts()  # ensure all_accounts df has been created
+            filtered_accounts = self.all_accounts[
+                self.all_accounts["account_type"].isin(acct_types)
             ]
             return filtered_accounts.index.tolist()
 
@@ -341,11 +340,16 @@ class GnuCash_Data_Analysis:
                     tx = csv_export
                 else:
                     tx = pd.concat([tx, csv_export])
-        return tx
+            tx = tx.join(
+                self.all_accounts[["finpack_account", "parent_accounts"]],
+                on="account_guid",
+            )
+        return tx.fillna(0)
 
 
 gda = GnuCash_Data_Analysis()
 # all_accounts = gda.get_all_accounts()
 # depr = gda.build_depreciation_dataframe(all_accounts)
-txns = gda.fetch_transactions(["ASSET"], True)
-print(txns)
+acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
+cash_accounts = gda.fetch_transactions(acct_types)
+print(cash_accounts)
