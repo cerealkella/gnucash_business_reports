@@ -407,9 +407,61 @@ class GnuCash_Data_Analysis:
             self.year = year
             year_mask = tx["post_date"].dt.year == self.year
             return tx[year_mask & guid_mask & action_mask]
-
         else:
             return tx[guid_mask & action_mask]
+
+    def get_farm_cash_transactions(self, year: int = 0) -> pd.DataFrame:
+        """_summary_
+
+        Args:
+            year (int, optional): User-provided year filter. Defaults to 0.
+
+        Returns:
+            pd.DataFrame: DataFrame containing farm expenses
+        """
+
+        def filter_and_reclassify_farm_transactions(tx: pd.DataFrame) -> pd.DataFrame:
+            """Postprocesses the Transactions dataframe for farm operations
+            Args:
+                tx (pd.DataFrame): dataframe containing unfiltered transactions
+
+            Returns:
+                pd.DataFrame: dataframe containing filtered transactions
+            """
+            # Income accounts filtered out, now re-classify inventory accounts
+            # as income
+            tx.loc[tx["account_code"].str.match("133|134"), "account_type"] = "INCOME"
+            tx.loc[tx["account_code"].str.match("133"), "account_code"] = "301c"
+            tx.loc[tx["account_code"].str.match("133"), "account_name"] = "Corn"
+            tx.loc[tx["account_code"].str.match("134"), "account_code"] = "303b"
+
+            # Classify Prepaids as Expense
+            tx.loc[tx["account_code"].str.match("146"), "account_type"] = "EXPENSE"
+
+            # Classify Non-Taxable Expenses
+            tx.loc[
+                tx["account_code"].str.startswith("9"), "account_type"
+            ] = "NF EXPENSE"
+
+            # Enterprise Column
+            tx["crop"] = "General"
+            tx.loc[tx["parent_accounts"].str.contains("Soybeans"), "crop"] = "Soybeans"
+            tx.loc[tx["parent_accounts"].str.contains("Corn"), "crop"] = "Corn"
+            tx.loc[tx["account_name"].str.contains("Soybeans"), "crop"] = "Soybeans"
+            tx.loc[tx["account_name"].str.contains("Corn"), "crop"] = "Corn"
+
+            # Remove Harvest Income, which gets posted to inventory from AR
+            # These accounts aren't actually cash entries
+            account_mask = tx["account_code"].isin(["301c", "303b"]) == False
+
+            # Apply Mask
+            tx = tx[account_mask]
+            return tx.sort_values(by=["account_code", "post_date"]).reset_index(
+                drop=True
+            )
+
+        tx = self.get_actual_cash_transactions(year)
+        return filter_and_reclassify_farm_transactions(tx)
 
     def get_invoices(self):
         # bring in invoices for quantities
@@ -425,4 +477,4 @@ gda = GnuCash_Data_Analysis()
 # cash_accounts = gda.fetch_transactions(acct_types)
 # print(cash_accounts)
 # print(gda.get_stock())
-print(gda.get_actual_cash_transactions(2022))
+print(gda.get_farm_cash_transactions())
