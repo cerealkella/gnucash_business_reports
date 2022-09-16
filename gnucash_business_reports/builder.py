@@ -344,12 +344,68 @@ class GnuCash_Data_Analysis:
                 self.all_accounts[["finpack_account", "parent_accounts"]],
                 on="account_guid",
             )
-        return tx.fillna(0)
+        invoices = self.get_invoices().groupby(["tx_guid", "account_guid"]).sum()
+        tx.set_index(["tx_guid", "account_guid"], inplace=True)
+        tx = tx.join(invoices[["quantity"]])
+
+        return tx.drop(columns=["qty"]).fillna(0)
+
+    def get_assets(self) -> pd.DataFrame:
+        """calls fetch transactions with ASSETS as parameter
+
+        Returns:
+            pd.Dataframe: dataframe containing asset transactions
+        """
+        return self.fetch_transactions(["ASSET"], True)
+
+    def get_cash(self) -> pd.DataFrame:
+        """calls fetch transactions with BANK, CASH as parameter
+
+        Returns:
+            pd.Dataframe: dataframe containing cash transactions
+        """
+        return self.fetch_transactions(["BANK", "CASH"], True)
+
+    def get_liabilities(self) -> pd.DataFrame:
+        """calls fetch transactions with liability types as parameters
+
+        Returns:
+            pd.Dataframe: dataframe containing liability transactions
+        """
+        return self.fetch_transactions(["LIABILITY", "CREDIT", "PAYABLE"], True)
+
+    def get_stock(self) -> pd.DataFrame:
+        """calls fetch transactions with STOCK, False as parameter
+        for farming operations this dataframe contains grain inventory
+
+        Returns:
+            pd.Dataframe: dataframe containing stock transactions
+        """
+        return self.fetch_transactions(["STOCK"], False)
+
+    def get_actual_cash_transactions(self) -> pd.DataFrame:
+        """calls fetch transactions passing the necessary account types
+        to retrieve actual cash transactions throughout the accounting period
+
+        Returns:
+            pd.Dataframe: dataframe containing desired transactions
+        """
+        return self.fetch_transactions(
+            ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"], True
+        )
+
+    def get_invoices(self):
+        # bring in invoices for quantities
+        invoices_sql = self.pdw.read_sql_file("sql/invoices_master.sql")
+        invoices = self.pdw.df_fetch(invoices_sql)
+        return invoices.rename(columns={"post_txn": "tx_guid"})
 
 
 gda = GnuCash_Data_Analysis()
 # all_accounts = gda.get_all_accounts()
 # depr = gda.build_depreciation_dataframe(all_accounts)
-acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
-cash_accounts = gda.fetch_transactions(acct_types)
-print(cash_accounts)
+# acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
+# cash_accounts = gda.fetch_transactions(acct_types)
+# print(cash_accounts)
+# print(gda.get_stock())
+print(gda.get_actual_cash_transactions())
