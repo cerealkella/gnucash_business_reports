@@ -265,6 +265,14 @@ class GnuCash_Data_Analysis:
 
         return build_dataframe(get_depreciation_accounts(df))
 
+    def get_guid_list(self, acct_types=[]):
+        """2020-10-25 Refactored function to make it more generic"""
+        self.get_all_accounts()  # ensure all_accounts df has been created
+        filtered_accounts = self.all_accounts[
+            self.all_accounts["account_type"].isin(acct_types)
+        ]
+        return filtered_accounts.index.tolist()
+
     def fetch_transactions(
         self, acct_types: list = [], inverse_multiplier: bool = True
     ) -> pd.DataFrame:
@@ -308,14 +316,6 @@ class GnuCash_Data_Analysis:
                     all_tx = pd.concat([all_tx, tx])
             return all_tx
 
-        def get_guid_list(acct_types=[]):
-            """2020-10-25 Refactored function to make it more generic"""
-            self.get_all_accounts()  # ensure all_accounts df has been created
-            filtered_accounts = self.all_accounts[
-                self.all_accounts["account_type"].isin(acct_types)
-            ]
-            return filtered_accounts.index.tolist()
-
         if self.CACHED_MODE:
             for account in acct_types:
                 csv_import = pd.read_csv(
@@ -333,7 +333,7 @@ class GnuCash_Data_Analysis:
                     tx = pd.concat([tx, csv_import])
         else:
             for account in acct_types:
-                guids = get_guid_list([account])
+                guids = self.get_guid_list([account])
                 csv_export = get_transactions_from_db(guids, inverse_multiplier)
                 csv_export.to_csv(f"{self.data_directory}/{account}.csv", index=False)
                 if account == acct_types[0]:
@@ -347,7 +347,7 @@ class GnuCash_Data_Analysis:
         invoices = self.get_invoices().groupby(["tx_guid", "account_guid"]).sum()
         tx.set_index(["tx_guid", "account_guid"], inplace=True)
         tx = tx.join(invoices[["quantity"]])
-
+        tx["post_date"] = pd.to_datetime(tx["post_date"], utc=True, yearfirst=True)
         return tx.drop(columns=["qty"]).fillna(0)
 
     def get_assets(self) -> pd.DataFrame:
@@ -383,16 +383,33 @@ class GnuCash_Data_Analysis:
         """
         return self.fetch_transactions(["STOCK"], False)
 
-    def get_actual_cash_transactions(self) -> pd.DataFrame:
+    def get_actual_cash_transactions(self, year: int = 0) -> pd.DataFrame:
         """calls fetch transactions passing the necessary account types
         to retrieve actual cash transactions throughout the accounting period
 
         Returns:
             pd.Dataframe: dataframe containing desired transactions
         """
-        return self.fetch_transactions(
-            ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"], True
+        accounts = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
+        tx = (
+            self.fetch_transactions(accounts, True)
+            .reset_index()
+            .sort_values(by=["post_date"])
         )
+
+        # Remove the acct-to-acct entries (e.g. AP to Checking, etc)
+        guid_mask = tx["account_guid"].isin(self.get_guid_list(accounts)) == False
+        # Remove Payment entries for Bills/Invoices.
+        action_mask = tx["split_action"].isin(["Payment"]) == False
+
+        # Filter to transactions from a given year if provided
+        if year > 0:
+            self.year = year
+            year_mask = tx["post_date"].dt.year == self.year
+            return tx[year_mask & guid_mask & action_mask]
+
+        else:
+            return tx[guid_mask & action_mask]
 
     def get_invoices(self):
         # bring in invoices for quantities
@@ -408,4 +425,4 @@ gda = GnuCash_Data_Analysis()
 # cash_accounts = gda.fetch_transactions(acct_types)
 # print(cash_accounts)
 # print(gda.get_stock())
-print(gda.get_actual_cash_transactions())
+print(gda.get_actual_cash_transactions(2022))
