@@ -16,6 +16,7 @@ class GnuCash_Data_Analysis:
         # Set Reporting year constant
         self.year = 2022
         self.all_accounts = None
+        self.cash_accounts = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
         # Suppress warnings, format numbers
         pd.options.mode.chained_assignment = None  # default='warn'
         pd.set_option("display.float_format", lambda x: "%.2f" % x)
@@ -400,22 +401,35 @@ class GnuCash_Data_Analysis:
         """
         return self.fetch_transactions(["STOCK"], False)
 
-    def get_actual_cash_transactions(self, year: int = 0) -> pd.DataFrame:
+    def get_all_cash_transactions(self, year: int = 0) -> pd.DataFrame:
         """calls fetch transactions passing the necessary account types
         to retrieve actual cash transactions throughout the accounting period
 
         Returns:
             pd.Dataframe: dataframe containing desired transactions
+            sorted by post dates
         """
-        accounts = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
-        tx = (
-            self.fetch_transactions(accounts, True)
+        return (
+            self.fetch_transactions(self.cash_accounts, True)
             .reset_index()
             .sort_values(by=["post_date"])
         )
 
+    def get_cleaned_cash_transactions(self, year: int = 0) -> pd.DataFrame:
+        """calls fetch transactions passing the necessary account types
+        to retrieve actual cash transactions throughout the accounting period
+        removes account to account entries (transfers) and payments on
+        payables and receivables
+
+        Returns:
+            pd.Dataframe: dataframe containing desired transactions
+        """
+        tx = self.get_all_cash_transactions(year)
+
         # Remove the acct-to-acct entries (e.g. AP to Checking, etc)
-        guid_mask = tx["account_guid"].isin(self.get_guid_list(accounts)) == False
+        guid_mask = (
+            tx["account_guid"].isin(self.get_guid_list(self.cash_accounts)) == False
+        )
         # Remove Payment entries for Bills/Invoices.
         action_mask = tx["split_action"].isin(["Payment"]) == False
 
@@ -477,8 +491,9 @@ class GnuCash_Data_Analysis:
 
             return tx.sort_values(by=["account_code", "post_date"])
 
-        tx = self.get_actual_cash_transactions(year)
-        return filter_and_reclassify_farm_transactions(tx)
+        return filter_and_reclassify_farm_transactions(
+            self.get_cleaned_cash_transactions(year)
+        )
 
     def get_invoices(self):
         # bring in invoices for quantities
@@ -494,16 +509,17 @@ depr = gda.get_depreciation_schedule(year)
 # cash_accounts = gda.fetch_transactions(acct_types)
 # print(cash_accounts)
 # print(gda.get_stock())
+all_tx = gda.get_all_cash_transactions(year)
 tx = gda.get_farm_cash_transactions(year)
 tx_w_depr = pd.concat([tx, depr])
 # tx_w_depr.reset_index(inplace=True)
 # tx_w_depr.sort_values(by=["account_code", "post_date"], inplace=True)
-tx_sum = tx_w_depr.groupby(["account_type", "account_code", "account_name"]).sum()
+tx_sum = tx_w_depr.groupby(
+    [
+        "account_type",
+    ]
+).sum()
 print(tx_sum)
-# print(depr.index)
-# print(tx.index)
-print(depr.dtypes)
-print(tx.dtypes)
 """
 print(depr)
 print(tx)
