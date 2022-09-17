@@ -217,6 +217,7 @@ class GnuCash_Data_Analysis:
             depreciation_schedule["reconcile_date"] = datetime.now().date
             depreciation_schedule["reconcile_state"] = ""
             depreciation_schedule["memo"] = "Generated Dynamically"
+            # depreciation_schedule["qty"] = 1.0
             depreciation_schedule["quantity"] = 1.0
             depreciation_schedule.rename(
                 columns={
@@ -248,6 +249,7 @@ class GnuCash_Data_Analysis:
                     "split_action",
                     "split_guid",
                     "amt",
+                    # "qty",
                     "reconcile_date",
                     "reconcile_state",
                     "memo",
@@ -366,7 +368,7 @@ class GnuCash_Data_Analysis:
         tx.set_index(["tx_guid", "account_guid"], inplace=True)
         tx = tx.join(invoices[["quantity"]])
         tx["post_date"] = pd.to_datetime(tx["post_date"], yearfirst=True)
-        return tx.drop(columns=["qty"]).fillna(0)
+        return tx.fillna(0)
 
     def get_assets(self) -> pd.DataFrame:
         """calls fetch transactions with ASSETS as parameter
@@ -395,11 +397,32 @@ class GnuCash_Data_Analysis:
     def get_stock(self) -> pd.DataFrame:
         """calls fetch transactions with STOCK, False as parameter
         for farming operations this dataframe contains grain inventory
+        qty (quantity) column is important for this calcualtion, as
+        it is needed when calculating different commodity values
 
         Returns:
             pd.Dataframe: dataframe containing stock transactions
         """
         return self.fetch_transactions(["STOCK"], False)
+
+    def get_balance_sheet(self) -> pd.DataFrame:
+        assets = self.get_assets()
+        assets["balance_sheet_category"] = "Assets"
+        cash = self.get_cash()
+        cash["balance_sheet_category"] = "Cash"
+        liabilities = self.get_liabilities()
+        liabilities["balance_sheet_category"] = "Liabilities"
+        stock = self.get_stock()
+        stock["balance_sheet_category"] = "Stock"
+
+        return pd.concat(
+            [
+                assets,
+                cash,
+                liabilities,
+                stock,
+            ]
+        )
 
     def get_all_cash_transactions(self, year: int = 0) -> pd.DataFrame:
         """calls fetch transactions passing the necessary account types
@@ -424,7 +447,7 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.Dataframe: dataframe containing desired transactions
         """
-        tx = self.get_all_cash_transactions(year)
+        tx = self.get_all_cash_transactions(year).drop(columns="qty")
 
         # Remove the acct-to-acct entries (e.g. AP to Checking, etc)
         guid_mask = (
@@ -524,3 +547,7 @@ print(tx_sum)
 print(depr)
 print(tx)
 """
+balance_sheet = gda.get_balance_sheet()
+balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
+print(balance_sheet)
+print(balance_sheet.groupby("balance_sheet_category").sum())
