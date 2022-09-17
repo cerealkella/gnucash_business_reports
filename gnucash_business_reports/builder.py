@@ -187,22 +187,21 @@ class GnuCash_Data_Analysis:
                 )
                 i += 1
 
-            depreciation_schedule.reset_index(drop=True, inplace=True)
+            # depreciation_schedule.reset_index(drop=True, inplace=True)
             depreciation_schedule = depreciation_schedule.join(
                 df, on="account_guid", rsuffix="_acct"
             )
-            depreciation_schedule["src_code"] = "800"
+            depreciation_schedule["account_code"] = "800"
+            depreciation_schedule["account_name"] = "Depreciation"
+            depreciation_schedule["account_type"] = "DEPRECIATION"
+            depreciation_schedule["src_code"] = depreciation_schedule["code"]
             # create dummy data for guid values
-            depreciation_schedule["src_guid"] = ""
-            depreciation_schedule["src_guid"] = depreciation_schedule["src_guid"].apply(
-                lambda v: uuid4().hex
-            )
-            depreciation_schedule["src_type"] = "DEPRECIATION"
-            depreciation_schedule["src_name"] = "Depreciation Schedule"
+            depreciation_schedule["src_guid"] = depreciation_schedule["account_guid"]
+            depreciation_schedule["account_guid"] = uuid4().hex
+            depreciation_schedule["src_type"] = depreciation_schedule["account_type"]
+            depreciation_schedule["src_name"] = depreciation_schedule["name"]
             depreciation_schedule["currency_guid"] = ""
-            depreciation_schedule["currency_guid"] = depreciation_schedule[
-                "currency_guid"
-            ].apply(lambda v: uuid4().hex)
+            depreciation_schedule["currency_guid"] = uuid4().hex
             depreciation_schedule["tx_num"] = str(depreciation_schedule.index)
             depreciation_schedule["tx_guid"] = ""
             depreciation_schedule["tx_guid"] = depreciation_schedule["tx_guid"].apply(
@@ -213,9 +212,6 @@ class GnuCash_Data_Analysis:
             depreciation_schedule["split_guid"] = depreciation_schedule[
                 "split_guid"
             ].apply(lambda v: uuid4().hex)
-            depreciation_schedule["post_date"] = depreciation_schedule[
-                "post_date"
-            ].dt.date
             depreciation_schedule["enter_date"] = datetime.now().date
             depreciation_schedule["reconcile_date"] = datetime.now().date
             depreciation_schedule["reconcile_state"] = ""
@@ -224,8 +220,8 @@ class GnuCash_Data_Analysis:
             depreciation_schedule.rename(
                 columns={
                     "description_acct": "account_desc",
-                    "name": "account_name",
-                    "code": "account_code",
+                    # "name": "src_name",
+                    # "code": "account_code",
                 },
                 inplace=True,
             )
@@ -242,6 +238,7 @@ class GnuCash_Data_Analysis:
                     "src_guid",
                     "src_code",
                     "src_type",
+                    "src_name",
                     "currency_guid",
                     "tx_num",
                     "enter_date",
@@ -252,6 +249,7 @@ class GnuCash_Data_Analysis:
                     "amt",
                     "reconcile_date",
                     "reconcile_state",
+                    "memo",
                     "finpack_account",
                     "parent_accounts",
                     "quantity",
@@ -260,7 +258,9 @@ class GnuCash_Data_Analysis:
             depreciation_df["post_date"] = depreciation_df["post_date"].astype(
                 "datetime64[ns]"
             )
-            return depreciation_df.set_index(["tx_guid", "account_guid"])
+            return depreciation_df.reset_index(
+                drop=True
+            )  # .set_index(["tx_guid", "account_guid"])
 
         return build_dataframe(get_depreciation_accounts())
 
@@ -364,7 +364,7 @@ class GnuCash_Data_Analysis:
         invoices = self.get_invoices().groupby(["tx_guid", "account_guid"]).sum()
         tx.set_index(["tx_guid", "account_guid"], inplace=True)
         tx = tx.join(invoices[["quantity"]])
-        tx["post_date"] = pd.to_datetime(tx["post_date"], utc=True, yearfirst=True)
+        tx["post_date"] = pd.to_datetime(tx["post_date"], yearfirst=True)
         return tx.drop(columns=["qty"]).fillna(0)
 
     def get_assets(self) -> pd.DataFrame:
@@ -475,9 +475,7 @@ class GnuCash_Data_Analysis:
             tx.loc[tx["account_name"].str.contains("Soybeans"), "crop"] = "Soybeans"
             tx.loc[tx["account_name"].str.contains("Corn"), "crop"] = "Corn"
 
-            return tx.sort_values(by=["account_code", "post_date"]).reset_index(
-                drop=True
-            )
+            return tx.sort_values(by=["account_code", "post_date"])
 
         tx = self.get_actual_cash_transactions(year)
         return filter_and_reclassify_farm_transactions(tx)
@@ -498,5 +496,15 @@ depr = gda.get_depreciation_schedule(year)
 # print(gda.get_stock())
 tx = gda.get_farm_cash_transactions(year)
 tx_w_depr = pd.concat([tx, depr])
+# tx_w_depr.reset_index(inplace=True)
+# tx_w_depr.sort_values(by=["account_code", "post_date"], inplace=True)
 tx_sum = tx_w_depr.groupby(["account_type", "account_code", "account_name"]).sum()
 print(tx_sum)
+# print(depr.index)
+# print(tx.index)
+print(depr.dtypes)
+print(tx.dtypes)
+"""
+print(depr)
+print(tx)
+"""
