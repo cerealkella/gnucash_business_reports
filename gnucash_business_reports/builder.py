@@ -87,15 +87,39 @@ class GnuCash_Data_Analysis:
         return self.all_accounts
 
     def get_commodity_prices(self) -> pd.DataFrame:
-        if self.CACHED_MODE:
-            query = "SELECT * FROM prices"
-            prices = self.pdw.df_fetch(query, parse_dates=["date"])
+        if not self.CACHED_MODE:
+            prices = self.pdw.df_fetch(
+                self.pdw.read_sql_file("sql/prices.sql"), parse_dates=["date"]
+            )
             prices.to_csv(f"{self.data_directory}/PRICES.csv")
         else:
             prices = pd.read_csv(
                 f"{self.data_directory}/PRICES.csv", parse_dates=["date"]
             )
         return prices
+
+    def get_latest_commodity_bids(self) -> pd.DataFrame:
+        prices = self.get_commodity_prices()  # .set_index("date").sort_index()
+        commodity_list = prices["commodity_guid"].unique().tolist()
+        prices["cash"] = prices["value_num"] / prices["value_denom"]
+        bids = prices[prices["type"].str.match("bid")].drop(
+            columns=[
+                "guid",
+                "source",
+                "currency_guid",
+                "source",
+                "type",
+                "value_num",
+                "value_denom",
+                "namespace",
+                "cusip",
+                "fraction",
+                "quote_flag",
+                "quote_source",
+                "quote_tz",
+            ]
+        )
+        return bids.sort_values("date").groupby("commodity_guid").last().reset_index()
 
     def build_depreciation_dataframe(self) -> pd.DataFrame:
         """Builds depreciation schedule
@@ -547,7 +571,14 @@ print(tx_sum)
 print(depr)
 print(tx)
 """
-balance_sheet = gda.get_balance_sheet()
-balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
-print(balance_sheet)
-print(balance_sheet.groupby("balance_sheet_category").sum())
+# balance_sheet = gda.get_balance_sheet()
+# balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
+# print(balance_sheet)
+# print(balance_sheet.groupby("balance_sheet_category").sum())
+
+# prices = gda.get_commodity_prices()
+# print(prices)
+
+# all_accounts = gda.get_all_accounts()
+# commodities = all_accounts["commodity_guid"].unique()
+# print(commodities.tolist())
