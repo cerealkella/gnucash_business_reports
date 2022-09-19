@@ -467,7 +467,6 @@ class GnuCash_Data_Analysis:
             .join(self.get_latest_commodity_bids().set_index("commodity_guid"))
         )
         df["balance_sheet_category"] = "Grain"
-        df["qty"] = df["qty"]
         df["amt"] = df["qty"] * df["cash"]
         return df.drop(columns=["quantity", "cash"])
 
