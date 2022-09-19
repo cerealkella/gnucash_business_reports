@@ -10,9 +10,9 @@ prices = gda.get_latest_commodity_bids()
 
 print(prices)
 
-year = 2021
+gda.year = 2021
 balance_sheet = gda.get_balance_sheet()
-balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
+# balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
 print(balance_sheet)
 balance_sheet_totals = balance_sheet.groupby("balance_sheet_category").sum()
 balance_sheet_totals.loc["Grain"] = (balance_sheet_totals.loc["Stock"]["qty"] * 2, 0, 0)
@@ -30,10 +30,18 @@ print(stock.groupby("commodity_guid").sum())
 
 
 grain = (
-    gda.get_grain(2021)
+    gda.get_stock()
     .groupby("commodity_guid")
     .sum()
     .join(gda.get_latest_commodity_bids().set_index("commodity_guid"))
 )
 grain["value"] = grain["qty"] * grain["cash"]
-print(grain)
+print(grain.drop(columns="quantity"))
+
+# print(gda.get_commodity_prices())
+
+# print(gda.get_depreciation_schedule())
+
+# print(gda.get_farm_cash_transactions())
+
+# print(gda.get_invoices())
