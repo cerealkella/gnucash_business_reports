@@ -454,24 +454,51 @@ class GnuCash_Data_Analysis:
             self.fetch_transactions(["STOCK"], False), "post_date", True
         )
 
-    def get_balance_sheet(self) -> pd.DataFrame:
+    def get_commdodity_stock_values(self) -> pd.DataFrame:
+        """_summary_
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        df = (
+            self.get_stock()
+            .groupby("commodity_guid")
+            .sum()
+            .join(self.get_latest_commodity_bids().set_index("commodity_guid"))
+        )
+        df["balance_sheet_category"] = "Grain"
+        df["qty"] = df["qty"] * -1
+        df["amt"] = df["qty"] * df["cash"]
+        return df.drop(columns=["quantity", "cash"])
+
+    def get_balance_sheet_details(self) -> pd.DataFrame:
         assets = self.get_assets()
         assets["balance_sheet_category"] = "Assets"
         cash = self.get_cash()
         cash["balance_sheet_category"] = "Cash"
         liabilities = self.get_liabilities()
         liabilities["balance_sheet_category"] = "Liabilities"
-        stock = self.get_stock()
-        stock["balance_sheet_category"] = "Stock"
-
         return pd.concat(
             [
                 assets,
                 cash,
                 liabilities,
-                stock,
             ]
         )
+
+    def get_balance_sheet(self) -> pd.DataFrame:
+        balance_sheet = (
+            self.get_balance_sheet_details()
+            .groupby("balance_sheet_category")
+            .sum()
+            .drop(columns=["quantity"])
+        )
+
+        grain = (
+            self.get_commdodity_stock_values().groupby("balance_sheet_category").sum()
+        )
+        # balance_sheet.loc["Grain"] = (grain["value"][0], grain["qty"][0])
+        return pd.concat([balance_sheet, grain])
 
     def get_all_cash_transactions(self) -> pd.DataFrame:
         """calls fetch transactions passing the necessary account types

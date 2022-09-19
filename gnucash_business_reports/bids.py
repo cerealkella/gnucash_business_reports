@@ -14,8 +14,8 @@ gda.year = 2021
 balance_sheet = gda.get_balance_sheet()
 # balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
 print(balance_sheet)
-balance_sheet_totals = balance_sheet.groupby("balance_sheet_category").sum()
-balance_sheet_totals.loc["Grain"] = (balance_sheet_totals.loc["Stock"]["qty"] * 2, 0, 0)
+# balance_sheet_totals = balance_sheet.groupby("balance_sheet_category").sum()
+# balance_sheet_totals.loc["Grain"] = (balance_sheet_totals.loc["Stock"]["qty"] * 2, 0, 0)
 
 """
 total_row.extend(column_filler(latex_df))
@@ -23,20 +23,11 @@ total_row.append(account_totals_dict[code])
 latex_df.loc["2021-12-31"] = total_row
 """
 
-print(balance_sheet_totals)
+# print(balance_sheet_totals)
 
-stock = gda.get_stock()
-print(stock.groupby("commodity_guid").sum())
+# stock = gda.get_stock()
+# print(stock.groupby("commodity_guid").sum())
 
-
-grain = (
-    gda.get_stock()
-    .groupby("commodity_guid")
-    .sum()
-    .join(gda.get_latest_commodity_bids().set_index("commodity_guid"))
-)
-grain["value"] = grain["qty"] * grain["cash"]
-print(grain.drop(columns="quantity"))
 
 # print(gda.get_commodity_prices())
 
