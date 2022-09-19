@@ -23,6 +23,30 @@ class GnuCash_Data_Analysis:
         self.pdw = pd_db_wrangler.Pandas_DB_Wrangler()
         self.pdw.set_connection_string(get_gnucash_file_path(), db_type="sqlite")
 
+    def filter_by_year(
+        self, df: pd.DataFrame, column: str, all_years_plus_specified: bool = False
+    ) -> pd.DataFrame:
+        """Helper function for passing in dataframes and filtering by year
+
+        Args:
+            df (pd.DataFrame): dataframe to filter
+            column (str): year column in dataframe
+            all_years_plus_specified (bool, optional): whether to be all inclusive
+            leading up to the specified year or just filter entries on the
+            year itself. Defaults to False.
+
+        Returns:
+            pd.DataFrame: dataframe filtered by year. If year = 0, it will pass
+            back the original dataframe
+        """
+        if self.year > 0:
+            if all_years_plus_specified:
+                return df[df[column].dt.year >= self.year]
+            else:
+                return df[df[column].dt.year == self.year]
+        else:
+            return df
+
     def get_all_accounts(self) -> pd.DataFrame:
         """
         Optionally Override cached mode
@@ -96,7 +120,7 @@ class GnuCash_Data_Analysis:
             prices = pd.read_csv(
                 f"{self.data_directory}/PRICES.csv", parse_dates=["date"]
             )
-        return prices
+        return self.filter_by_year(prices, "date")
 
     def get_latest_commodity_bids(self) -> pd.DataFrame:
         prices = self.get_commodity_prices()  # .set_index("date").sort_index()
@@ -291,23 +315,14 @@ class GnuCash_Data_Analysis:
 
         return build_dataframe(get_depreciation_accounts())
 
-    def get_depreciation_schedule(self, year: int = 0) -> pd.DataFrame:
+    def get_depreciation_schedule(self) -> pd.DataFrame:
         """returns depreciation schedule transactions
-
-        Args:
-            year (int, optional): if a year is specified, the function
-            will filter on it. Defaults to 0.
 
         Returns:
             pd.DataFrame: dataframe containing depreciation transactions
+            for the specified year
         """
-        df = self.build_depreciation_dataframe()
-        if year > 0:
-            self.year = year
-            year_mask = df["post_date"].dt.year == self.year
-            return df[year_mask]
-        else:
-            return df
+        return self.filter_by_year(self.build_depreciation_dataframe(), "post_date")
 
     def get_guid_list(self, acct_types=[]):
         """2020-10-25 Refactored function to make it more generic"""
@@ -400,7 +415,9 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.Dataframe: dataframe containing asset transactions
         """
-        return self.fetch_transactions(["ASSET"], True)
+        return self.filter_by_year(
+            self.fetch_transactions(["ASSET"], True), "post_date", True
+        )
 
     def get_cash(self) -> pd.DataFrame:
         """calls fetch transactions with BANK, CASH as parameter
@@ -408,7 +425,9 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.Dataframe: dataframe containing cash transactions
         """
-        return self.fetch_transactions(["BANK", "CASH"], True)
+        return self.filter_by_year(
+            self.fetch_transactions(["BANK", "CASH"], True), "post_date", True
+        )
 
     def get_liabilities(self) -> pd.DataFrame:
         """calls fetch transactions with liability types as parameters
@@ -416,7 +435,11 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.Dataframe: dataframe containing liability transactions
         """
-        return self.fetch_transactions(["LIABILITY", "CREDIT", "PAYABLE"], True)
+        return self.filter_by_year(
+            self.fetch_transactions(["LIABILITY", "CREDIT", "PAYABLE"], True),
+            "post_date",
+            True,
+        )
 
     def get_stock(self) -> pd.DataFrame:
         """calls fetch transactions with STOCK, False as parameter
@@ -427,24 +450,9 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.Dataframe: dataframe containing stock transactions
         """
-        return self.fetch_transactions(["STOCK"], False)
-
-    def get_grain(self, year: int = 0) -> pd.DataFrame:
-        """calls fetch transactions with STOCK, False as parameter
-        for farming operations this dataframe contains grain inventory
-        qty (quantity) column is important for this calcualtion, as
-        it is needed when calculating different commodity values
-
-        Returns:
-            pd.Dataframe: dataframe containing stock transactions
-        """
-        df = self.fetch_transactions(["STOCK"], False)
-        if year > 0:
-            self.year = year
-            year_mask = df["post_date"].dt.year <= self.year
-            return df[year_mask]
-        else:
-            return df
+        return self.filter_by_year(
+            self.fetch_transactions(["STOCK"], False), "post_date", True
+        )
 
     def get_balance_sheet(self) -> pd.DataFrame:
         assets = self.get_assets()
@@ -465,7 +473,7 @@ class GnuCash_Data_Analysis:
             ]
         )
 
-    def get_all_cash_transactions(self, year: int = 0) -> pd.DataFrame:
+    def get_all_cash_transactions(self) -> pd.DataFrame:
         """calls fetch transactions passing the necessary account types
         to retrieve actual cash transactions throughout the accounting period
 
@@ -479,7 +487,7 @@ class GnuCash_Data_Analysis:
             .sort_values(by=["post_date"])
         )
 
-    def get_cleaned_cash_transactions(self, year: int = 0) -> pd.DataFrame:
+    def get_cleaned_cash_transactions(self) -> pd.DataFrame:
         """calls fetch transactions passing the necessary account types
         to retrieve actual cash transactions throughout the accounting period
         removes account to account entries (transfers) and payments on
@@ -488,7 +496,7 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.Dataframe: dataframe containing desired transactions
         """
-        tx = self.get_all_cash_transactions(year).drop(columns="qty")
+        tx = self.get_all_cash_transactions().drop(columns="qty")
 
         # Remove the acct-to-acct entries (e.g. AP to Checking, etc)
         guid_mask = (
@@ -498,18 +506,10 @@ class GnuCash_Data_Analysis:
         action_mask = tx["split_action"].isin(["Payment"]) == False
 
         # Filter to transactions from a given year if provided
-        if year > 0:
-            self.year = year
-            year_mask = tx["post_date"].dt.year == self.year
-            return tx[year_mask & guid_mask & action_mask]
-        else:
-            return tx[guid_mask & action_mask]
+        return self.filter_by_year(tx[guid_mask & action_mask], "post_date")
 
-    def get_farm_cash_transactions(self, year: int = 0) -> pd.DataFrame:
+    def get_farm_cash_transactions(self) -> pd.DataFrame:
         """_summary_
-
-        Args:
-            year (int, optional): User-provided year filter. Defaults to 0.
 
         Returns:
             pd.DataFrame: DataFrame containing farm expenses
@@ -556,35 +556,39 @@ class GnuCash_Data_Analysis:
             return tx.sort_values(by=["account_code", "post_date"])
 
         return filter_and_reclassify_farm_transactions(
-            self.get_cleaned_cash_transactions(year)
+            self.get_cleaned_cash_transactions()
         )
 
     def get_invoices(self):
         # bring in invoices for quantities
         invoices_sql = self.pdw.read_sql_file("sql/invoices_master.sql")
-        invoices = self.pdw.df_fetch(invoices_sql)
-        return invoices.rename(columns={"post_txn": "tx_guid"})
+        invoices = self.pdw.df_fetch(
+            invoices_sql, parse_dates=["date_posted", "date_opened", "entry_date"]
+        )
+        return self.filter_by_year(
+            invoices.rename(columns={"post_txn": "tx_guid"}), "date_posted"
+        )
 
 
-year = 2022
-gda = GnuCash_Data_Analysis()
-depr = gda.get_depreciation_schedule(year)
+# year = 2022
+# gda = GnuCash_Data_Analysis()
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)
 # print(cash_accounts)
 # print(gda.get_stock())
-all_tx = gda.get_all_cash_transactions(year)
-tx = gda.get_farm_cash_transactions(year)
-tx_w_depr = pd.concat([tx, depr])
+# all_tx = gda.get_all_cash_transactions(year)
+# tx = gda.get_farm_cash_transactions(year)
+# tx_w_depr = pd.concat([tx, depr])
 # tx_w_depr.reset_index(inplace=True)
 # tx_w_depr.sort_values(by=["account_code", "post_date"], inplace=True)
+"""
 tx_sum = tx_w_depr.groupby(
     [
         "account_type",
     ]
 ).sum()
 print(tx_sum)
-"""
+
 print(depr)
 print(tx)
 """
