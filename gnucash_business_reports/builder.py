@@ -41,7 +41,7 @@ class GnuCash_Data_Analysis:
         """
         if self.year > 0:
             if all_years_plus_specified:
-                return df[df[column].dt.year >= self.year]
+                return df[df[column].dt.year <= self.year]
             else:
                 return df[df[column].dt.year == self.year]
         else:
@@ -467,7 +467,7 @@ class GnuCash_Data_Analysis:
             .join(self.get_latest_commodity_bids().set_index("commodity_guid"))
         )
         df["balance_sheet_category"] = "Grain"
-        df["qty"] = df["qty"] * -1
+        df["qty"] = df["qty"]
         df["amt"] = df["qty"] * df["cash"]
         return df.drop(columns=["quantity", "cash"])
 
@@ -535,7 +535,9 @@ class GnuCash_Data_Analysis:
         # Filter to transactions from a given year if provided
         return self.filter_by_year(tx[guid_mask & action_mask], "post_date")
 
-    def get_farm_cash_transactions(self) -> pd.DataFrame:
+    def get_farm_cash_transactions(
+        self, include_depreciation: bool = False
+    ) -> pd.DataFrame:
         """_summary_
 
         Returns:
@@ -582,9 +584,13 @@ class GnuCash_Data_Analysis:
 
             return tx.sort_values(by=["account_code", "post_date"])
 
-        return filter_and_reclassify_farm_transactions(
+        df = filter_and_reclassify_farm_transactions(
             self.get_cleaned_cash_transactions()
         )
+        if include_depreciation:
+            return pd.concat([df, self.get_depreciation_schedule()])
+        else:
+            return df
 
     def get_invoices(self):
         # bring in invoices for quantities
@@ -608,17 +614,7 @@ class GnuCash_Data_Analysis:
 # tx_w_depr = pd.concat([tx, depr])
 # tx_w_depr.reset_index(inplace=True)
 # tx_w_depr.sort_values(by=["account_code", "post_date"], inplace=True)
-"""
-tx_sum = tx_w_depr.groupby(
-    [
-        "account_type",
-    ]
-).sum()
-print(tx_sum)
 
-print(depr)
-print(tx)
-"""
 # balance_sheet = gda.get_balance_sheet()
 # balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
 # print(balance_sheet)
