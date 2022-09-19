@@ -14,7 +14,7 @@ class GnuCash_Data_Analysis:
         self.CACHED_MODE = cached_mode
         self.data_directory = get_datadir()
         # Set Reporting year constant
-        self.year = 2022
+        self.year = 0
         self.all_accounts = None
         self.cash_accounts = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
         # Suppress warnings, format numbers
@@ -428,6 +428,23 @@ class GnuCash_Data_Analysis:
             pd.Dataframe: dataframe containing stock transactions
         """
         return self.fetch_transactions(["STOCK"], False)
+
+    def get_grain(self, year: int = 0) -> pd.DataFrame:
+        """calls fetch transactions with STOCK, False as parameter
+        for farming operations this dataframe contains grain inventory
+        qty (quantity) column is important for this calcualtion, as
+        it is needed when calculating different commodity values
+
+        Returns:
+            pd.Dataframe: dataframe containing stock transactions
+        """
+        df = self.fetch_transactions(["STOCK"], False)
+        if year > 0:
+            self.year = year
+            year_mask = df["post_date"].dt.year <= self.year
+            return df[year_mask]
+        else:
+            return df
 
     def get_balance_sheet(self) -> pd.DataFrame:
         assets = self.get_assets()
