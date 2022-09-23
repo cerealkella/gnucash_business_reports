@@ -36,7 +36,7 @@ caption = {{ {caption} }}
  		colspec = {{XXXXr}}, width = 0.95\linewidth,
  		rowhead = 2, rowfoot = 1,
  		row{{odd}} = {{gray9}}, row{{even}} = {{blue9}},
- 		row{{1-2}} = {{green8}}, row{{Z}} = {{blue7}},
+ 		row{{1}} = {{green8}}, row{{Z}} = {{blue7}},
  	}}
 """
     lines[0] = new_firstline
