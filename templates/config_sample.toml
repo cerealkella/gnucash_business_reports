@@ -2,5 +2,18 @@
 # name it config.toml
 [Organization]
 business_name="Old McDonald's Farm"
+
 [GNUCash]
 file_path="/home/user/thebooks.gnucash"
+
+[Valuation]
+# Total number of corporate shares issued
+Shares = 500
+
+[Discounts]
+# Used for calculating share value
+# values are percentages
+Assets = 80
+Liabilities = 100
+Cash = 70
+Grain = 70
