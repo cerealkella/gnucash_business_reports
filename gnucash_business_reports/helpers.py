@@ -16,6 +16,35 @@ def add_hline(latex: str, index: int) -> str:
     return "\n".join(lines).replace("NaN", "")
 
 
+def column_type_changer(latex: str, caption: str) -> str:
+    """
+    For report creation and formatting
+    Changes latex tables from tabular to longtblr
+
+    Args:
+        latex: latex table
+        index: index of horizontal line insertion (in lines)
+    """
+    latex_lines = latex.splitlines()
+    items_to_remove = ["\\toprule", "\midrule", "\\bottomrule"]
+    lines = [x for x in latex_lines if x not in items_to_remove]
+    new_firstline = f"""
+\\begin{{longtblr}}[
+theme = fancy,
+caption = {{ {caption} }}
+ 	]{{
+ 		colspec = {{XXXXr}}, width = 0.95\linewidth,
+ 		rowhead = 2, rowfoot = 1,
+ 		row{{odd}} = {{gray9}}, row{{even}} = {{blue9}},
+ 		row{{1-2}} = {{green8}}, row{{Z}} = {{blue7}},
+ 	}}
+"""
+    lines[0] = new_firstline
+    lines[len(lines) - 1] = "\end{longtblr}"
+
+    return "\n".join(lines).replace("NaN", "")
+
+
 def column_filler(df: DataFrame) -> list:
     """
     For report creation and formatting

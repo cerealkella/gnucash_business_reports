@@ -1,0 +1,29 @@
+\documentclass[11pt]{article}
+\usepackage[portrait, tmargin=.5in, lmargin=.5in, rmargin=.6in]{geometry}
+\usepackage{tabularray}
+\usepackage{xcolor}
+
+% table formatting
+\NewTblrTheme{fancy}{
+	\SetTblrStyle{firsthead}{font=\bfseries}
+	\SetTblrStyle{firstfoot}{fg=blue2}
+	\SetTblrStyle{middlefoot}{\itshape}
+	\SetTblrStyle{caption-tag}{black}
+}
+
+% Header Information
+\title{\textbf{\VAR{data.report_name}}}
+\author{{\VAR{data.organization_name}}}
+\date{\today}
+
+\begin{document}
+\maketitle
+\newpage
+
+\section { Detailed Transaction Listing }
+% This is a regular LaTeX comment
+\BLOCK{ for key, value in data1.items() }
+\subsection{\VAR{names[key]}}
+    \VAR{value}
+\BLOCK{ endfor }
+\end{document}
