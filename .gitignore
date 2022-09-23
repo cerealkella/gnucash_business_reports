@@ -120,3 +120,6 @@ export/*
 private/*.txt
 latex/*
 .direnv
+templates/*.fls
+templates/*.aux
+templates/*.fdb_latexmk
