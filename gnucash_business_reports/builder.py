@@ -264,7 +264,7 @@ class GnuCash_Data_Analysis:
             depreciation_schedule["enter_date"] = datetime.now().date
             depreciation_schedule["reconcile_date"] = datetime.now().date
             depreciation_schedule["reconcile_state"] = ""
-            depreciation_schedule["memo"] = "Generated Dynamically"
+            depreciation_schedule["memo"] = depreciation_schedule["name"]
             # depreciation_schedule["qty"] = 1.0
             depreciation_schedule["quantity"] = 1.0
             depreciation_schedule.rename(
