@@ -2,7 +2,7 @@ from .builder import GnuCash_Data_Analysis
 
 
 gda = GnuCash_Data_Analysis()
-gda.year = 2021
+gda.year = 2022
 tx_w_depr = gda.get_farm_cash_transactions(include_depreciation=True)
 tx_w_depr.reset_index(inplace=True)
 tx_w_depr.sort_values(by=["account_code", "post_date"], inplace=True)
