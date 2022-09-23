@@ -13,10 +13,13 @@ def get_datadir() -> Path:
     return datadir
 
 
+def get_config() -> dict:
+    with open(get_datadir().joinpath("config.toml"), "rb") as f:
+        return tomli.load(f)
+
+
 def get_gnucash_file_path() -> Path:
     """Parse config file from datadir
     This function assumes a config.toml file exists in the local datadir
     """
-    with open(get_datadir().joinpath("config.toml"), "rb") as f:
-        toml_dict = tomli.load(f)
-        return toml_dict["GNUCash"]["file_path"]
+    return get_config()["GNUCash"]["file_path"]
