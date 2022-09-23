@@ -5,7 +5,7 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from dateutil.relativedelta import relativedelta
 from uuid import uuid4
-from .config import get_datadir, get_gnucash_file_path
+from .config import get_datadir, get_gnucash_file_path, get_config
 from .helpers import get_keys, parse_toml
 
 
@@ -600,6 +600,19 @@ class GnuCash_Data_Analysis:
         return self.filter_by_year(
             invoices.rename(columns={"post_txn": "tx_guid"}), "date_posted"
         )
+
+    def get_corporation_value(self):
+        balance_sheet = self.get_balance_sheet()
+        corp_config = get_config()
+        total_shares = corp_config["Valuation"]["Shares"]
+        discounts = corp_config["Discounts"]
+        for key in discounts:
+            balance_sheet.loc[key, "share_val"] = (
+                (discounts[key] / 100) * balance_sheet.loc[key]["amt"]
+            ) / total_shares
+
+        balance_sheet.loc["Total"] = balance_sheet.sum().to_list()
+        return balance_sheet.drop(columns=["qty"])
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
