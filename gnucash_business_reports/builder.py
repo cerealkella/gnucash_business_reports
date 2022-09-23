@@ -14,7 +14,7 @@ class GnuCash_Data_Analysis:
         self.CACHED_MODE = cached_mode
         self.data_directory = get_datadir()
         # Set Reporting year constant
-        self.year = 0
+        self.year = datetime.now().year  # defaults to current year
         self.all_accounts = None
         self.cash_accounts = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
         # Suppress warnings, format numbers
@@ -600,6 +600,62 @@ class GnuCash_Data_Analysis:
         return self.filter_by_year(
             invoices.rename(columns={"post_txn": "tx_guid"}), "date_posted"
         )
+
+    def sanity_checker(self) -> bool:
+        all_tx = self.get_all_cash_transactions()
+        tx = self.get_farm_cash_transactions()
+
+        # *** TOTALS ***
+        account_totals = tx.groupby(["account_type"]).sum()
+        net_cash_flow = round(account_totals.sum()[0], 2)
+        account_totals.loc["TOTAL (NET)"] = net_cash_flow
+
+        last_year_mask = all_tx["post_date"].dt.year < self.year
+        year_mask = all_tx["post_date"].dt.year <= self.year
+        chk_mask = all_tx["src_type"].str.match("(BANK)|(CREDIT)|(CASH)")
+        # chk_mask = all_tx["src_code"].str.match("100")
+        ar_mask = all_tx["src_type"].str.match("RECEIVABLE")
+        ap_mask = all_tx["src_type"].str.match("PAYABLE")
+
+        # Get ending checking balances, ensure consistency with
+        # Balance Sheet from GNUCash
+        ending_chk_bal = round(all_tx[chk_mask & year_mask]["amt"].sum(), 2)
+        ending_ap_bal = round(all_tx[ap_mask & year_mask]["amt"].sum(), 2)
+        ending_ar_bal = round(all_tx[ar_mask & year_mask]["amt"].sum(), 2)
+        last_year_bal = round(all_tx[chk_mask & last_year_mask]["amt"].sum(), 2)
+        last_year_ar_ap_bal = round(
+            all_tx[(ar_mask | ap_mask) & last_year_mask]["amt"].sum(), 2
+        )
+        net_ar_ap = round(ending_ap_bal + ending_ar_bal, 2)
+        net = round(net_cash_flow + last_year_ar_ap_bal + last_year_bal - net_ar_ap, 2)
+
+        print(
+            "{} Ending cash balance was:                   {}".format(
+                self.year - 1, last_year_bal
+            )
+        )
+        print(
+            "{} Ending AR/AP balance was:                 {}".format(
+                self.year - 1, last_year_ar_ap_bal
+            )
+        )
+        sanity = net == ending_chk_bal
+        print(
+            "{} Finpack net inflows and outflows:  (+){}".format(
+                self.year, net_cash_flow
+            )
+        )
+        print(
+            "{} ending AR/AP balance:              (+){}".format(self.year, net_ar_ap)
+        )
+        print("{} Finpack net minus AR/AP balance:   (=){}".format(self.year, net))
+        print("-----------------------------------------------------")
+        print(
+            "{} Ending balance sheet balance was: {}".format(self.year, ending_chk_bal)
+        )
+        print(" -- We balance, right? ----------------- {}".format(sanity))
+        print("Difference = {}".format(round(net - ending_chk_bal, 2)))
+        return sanity
 
 
 # year = 2022
