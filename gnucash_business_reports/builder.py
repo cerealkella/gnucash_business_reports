@@ -614,6 +614,68 @@ class GnuCash_Data_Analysis:
         balance_sheet.loc["Total"] = balance_sheet.sum().to_list()
         return balance_sheet.drop(columns=["qty"])
 
+    def get_1099_vendor_report(self):
+        """Pulls 1099 Vendors from database and drops the data in an
+        Excel file to be shipped off for 1099 creation
+        """
+        tax_1099_vendors = self.pdw.read_sql_file("sql/1099_vendors.sql")
+        vendors = self.pdw.df_fetch(tax_1099_vendors, parse_dates=["post_date"])
+
+        # Filter to transactions from a given year
+        vendors = vendors[vendors["post_date"].dt.year == self.year]
+        # Drop the time, not needed
+        vendors["post_date"] = vendors["post_date"].dt.date
+
+        all_accounts = self.get_all_accounts().reset_index()
+        all_accounts.rename(columns={"guid": "acct_guid"}, inplace=True)
+        print(all_accounts)
+        all_accounts.set_index("acct_guid", drop=True, inplace=True)
+
+        # Pull in "Finpack Account" - Which is not Filtered based on Commodity
+        vendors = vendors.join(
+            all_accounts[["finpack_account", "parent_accounts"]], on="acct_guid"
+        )
+
+        grouped_vendors = (
+            vendors.groupby(
+                [
+                    "finpack_account",
+                    "vendor_name",
+                    "vendor_id",
+                    "addr_addr1",
+                    "addr_addr2",
+                    "addr_addr3",
+                ]
+            )
+            .sum(numeric_only=True)
+            .round(2)
+        )
+        grouped_vendors.reset_index(inplace=True)
+
+        writer = pd.ExcelWriter(
+            f"export/{self.year}-1099_Vendor_Data.xlsx", engine="xlsxwriter"
+        )
+        grouped_vendors.to_excel(writer, index=False, sheet_name="Corporation")
+        workbook = writer.book
+        sheet = writer.sheets["Corporation"]
+        fmt_currency = workbook.add_format({"num_format": "$#,##0.00", "bold": False})
+        fmt_header = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "top",
+                "fg_color": "#5DADE2",
+                "font_color": "#FFFFFF",
+                "border": 1,
+            }
+        )
+
+        for col, value in enumerate(grouped_vendors.columns.values):
+            sheet.write(0, col, value, fmt_header)
+        sheet.set_column("G:G", 10, fmt_currency)
+
+        writer.close()
+
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
         tx = self.get_farm_cash_transactions()
