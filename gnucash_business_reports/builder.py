@@ -56,20 +56,16 @@ class GnuCash_Data_Analysis:
         """
         if self.all_accounts is None:
             if self.CACHED_MODE:
-                all_accounts = pd.read_csv(
+                df = pd.read_csv(
                     f"{self.data_directory}/ALL_ACCOUNTS.csv", dtype={"code": object}
                 )
             else:
-                all_accounts = self.pdw.df_fetch(
-                    self.pdw.read_sql_file("sql/all_accounts.sql")
-                )
-                all_accounts.to_csv(
-                    f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False
-                )
+                df = self.pdw.df_fetch(self.pdw.read_sql_file("sql/all_accounts.sql"))
+                df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False)
 
-            all_account_types = all_accounts["account_type"].unique().tolist()
-            id_name_dict = dict(zip(all_accounts["guid"], all_accounts["name"]))
-            parent_dict = dict(zip(all_accounts["guid"], all_accounts["parent_guid"]))
+            all_account_types = df["account_type"].unique().tolist()
+            id_name_dict = dict(zip(df["guid"], df["name"]))
+            parent_dict = dict(zip(df["guid"], df["parent_guid"]))
 
             def find_parent(x) -> str:
                 """Function to recursively determine parents for accounts"""
@@ -91,23 +87,28 @@ class GnuCash_Data_Analysis:
                 else:
                     return ""
 
-            all_accounts["parent_accounts"] = (
-                all_accounts["guid"].apply(lambda x: find_parent(x)).str.rstrip(">")
+            df["parent_accounts"] = (
+                df["guid"].apply(lambda x: find_parent(x)).str.rstrip(">")
             )
-            all_accounts["finpack_account"] = all_accounts["parent_accounts"].apply(
+            df["finpack_account"] = df["parent_accounts"].apply(
                 lambda x: get_third_level(x)
             )
-            all_accounts.loc[
-                all_accounts["finpack_account"] == "", "finpack_account"
-            ] = all_accounts["name"]
+            df.loc[df["finpack_account"] == "", "finpack_account"] = df["name"]
 
-            all_accounts.set_index("guid", drop=True, inplace=True)
+            df.set_index("guid", drop=True, inplace=True)
+
+            # Enterprise Column
+            df["crop"] = "General"
+            df.loc[df["parent_accounts"].str.contains("Soybeans"), "crop"] = "Soybeans"
+            df.loc[df["parent_accounts"].str.contains("Corn"), "crop"] = "Corn"
+            df.loc[df["name"].str.contains("Soybeans"), "crop"] = "Soybeans"
+            df.loc[df["name"].str.contains("Corn"), "crop"] = "Corn"
 
             if not self.CACHED_MODE:
                 # Create CSV with Parental Tree for reporting
-                all_accounts.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
+                df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
                 # Create CSV with Prices which is used for valuation
-            self.all_accounts = all_accounts
+            self.all_accounts = df
         return self.all_accounts
 
     def get_commodity_prices(self) -> pd.DataFrame:
@@ -574,13 +575,6 @@ class GnuCash_Data_Analysis:
                 tx["account_code"].str.startswith("9"), "account_type"
             ] = "NF EXPENSE"
 
-            # Enterprise Column
-            tx["crop"] = "General"
-            tx.loc[tx["parent_accounts"].str.contains("Soybeans"), "crop"] = "Soybeans"
-            tx.loc[tx["parent_accounts"].str.contains("Corn"), "crop"] = "Corn"
-            tx.loc[tx["account_name"].str.contains("Soybeans"), "crop"] = "Soybeans"
-            tx.loc[tx["account_name"].str.contains("Corn"), "crop"] = "Corn"
-
             return tx.sort_values(by=["account_code", "post_date"])
 
         df = filter_and_reclassify_farm_transactions(
@@ -732,6 +726,47 @@ class GnuCash_Data_Analysis:
         details_sheet.set_column("D:D", 10, fmt_currency)
         del pdw_personal
         writer.close()
+
+    def get_rented_acres(self):
+        # drop unnecessary columns
+        df = (
+            self.get_invoices()
+            .drop(
+                columns=["paytype", "disc_how", "disc_amt", "taxable", "taxincluded"],
+            )
+            .join(self.get_all_accounts(), on="account_guid", rsuffix="_acct")
+        )
+
+        cash_rent = df["account_code"].isin(["424b", "424c"])
+
+        # Filter to project only. "Project" is one of three dropdown
+        # choices available in GNUCash The others being "Hours" and
+        # "Material". When entering these values in the system, it's
+        # important "Project" for Base Rent payments, as it will
+        # differentiate between the base rent and bonus rent.
+        base_only = df["quantity_type"] == "Project"
+        df = (
+            df[cash_rent & base_only]
+            .groupby(["crop", "operation", "operation_id", "org_name"])[
+                "quantity", "amt"
+            ]
+            .sum()
+            .round(2)
+            .rename(index=str, columns={"quantity": "acres"})
+        )
+        df["base_rent"] = round(df["amt"] / df["acres"])
+        # grouped_inv.head(12)
+        return df
+
+    def get_planted_acres(self) -> pd.DataFrame:
+        return (
+            self.get_rented_acres()
+            .reset_index()
+            .drop(columns=["org_name", "amt", "base_rent", "operation_id"])
+            .groupby(["crop", "operation"])
+            .sum()
+            .round(2)
+        )
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
