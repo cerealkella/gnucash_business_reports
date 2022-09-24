@@ -676,6 +676,63 @@ class GnuCash_Data_Analysis:
 
         writer.close()
 
+    def get_1099_personal_vendors(self):
+        pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler()
+        pdw_personal.set_connection_string(
+            get_gnucash_file_path(books="personal"), db_type="sqlite"
+        )
+
+        tax_1099_vendors = pdw_personal.read_sql_file("sql/1099_vendors_personal.sql")
+        personal_vendors = pdw_personal.df_fetch(
+            tax_1099_vendors, parse_dates=["post_date"]
+        )
+
+        # Filter to transactions from a given year
+        year_mask = personal_vendors["post_date"].dt.year == self.year
+        # Apply the filter to the dataframe
+        personal_vendors = personal_vendors[year_mask]
+        # Drop the time, not needed
+        personal_vendors["post_date"] = personal_vendors["post_date"].dt.date
+
+        grouped_personal_vendors = (
+            personal_vendors.groupby(["description"]).sum(numeric_only=True).round(2)
+        )
+        grouped_personal_vendors.reset_index(inplace=True)
+
+        writer = pd.ExcelWriter(
+            f"export/{self.year}-1099_Personal.xlsx", engine="xlsxwriter"
+        )
+        grouped_personal_vendors.to_excel(writer, index=False, sheet_name="Totals")
+        workbook = writer.book
+
+        totals_sheet = writer.sheets["Totals"]
+        # Adding currency format
+        fmt_currency = workbook.add_format({"num_format": "$#,##0.00", "bold": False})
+        fmt_header = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "top",
+                "fg_color": "#5DADE2",
+                "font_color": "#FFFFFF",
+                "border": 1,
+            }
+        )
+
+        for col, value in enumerate(grouped_personal_vendors.columns.values):
+            totals_sheet.write(0, col, value, fmt_header)
+
+        totals_sheet.set_column("B:B", 10, fmt_currency)
+
+        personal_vendors.to_excel(writer, index=False, sheet_name="Detail")
+        details_sheet = writer.sheets["Detail"]
+        for col, value in enumerate(personal_vendors.columns.values):
+            details_sheet.write(0, col, value, fmt_header)
+
+        details_sheet.set_column("D:D", 10, fmt_currency)
+        del pdw_personal
+        writer.close()
+
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
         tx = self.get_farm_cash_transactions()

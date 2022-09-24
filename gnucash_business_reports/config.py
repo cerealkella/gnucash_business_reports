@@ -18,8 +18,17 @@ def get_config() -> dict:
         return tomli.load(f)
 
 
-def get_gnucash_file_path() -> Path:
+def get_gnucash_file_path(books: str = "business") -> Path:
     """Parse config file from datadir
     This function assumes a config.toml file exists in the local datadir
+
+    Args:
+        books (str, optional): Which books to process. The books are
+        defined in the config.toml file, "business" and "personal" are the
+        two options
+        Defaults to "business".
+
+    Returns:
+        Path: Path to business or personal data file
     """
-    return get_config()["GNUCash"]["file_path"]
+    return get_config()["GNUCash"][f"{books}_path"]

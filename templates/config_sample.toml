@@ -4,7 +4,8 @@
 business_name="Old McDonald's Farm"
 
 [GNUCash]
-file_path="/home/user/thebooks.gnucash"
+business_path="/home/user/thebusinessbooks.gnucash"
+personal_path="/home/user/thepersonalbooks.gnucash"
 
 [Valuation]
 # Total number of corporate shares issued
