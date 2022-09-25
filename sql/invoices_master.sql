@@ -12,6 +12,7 @@ select
 	billto.id as operation_id,
 	billto.name as operation,
 	owner_job.vendor_name as org_name,
+	owner_job.vendor_notes as org_notes,
 	/* accounts */
 	accounts.guid as account_guid,
 	accounts.code as account_code,
@@ -52,6 +53,7 @@ join (
 		jobs.id,
 		jobs.name,
 		vendors.name as vendor_name,
+		vendors.notes as vendor_notes,
 		jobs.guid
 	from
 		jobs
@@ -72,6 +74,7 @@ union select
 	owner_job.id as operation_id,
 	owner_job.name as operation,
 	owner_job.customer_name as org_name,
+	owner_job.customer_notes as org_notes,
 	/* accounts */
 	accounts.guid as account_guid,
 	accounts.code as account_code,
@@ -104,6 +107,7 @@ join (
 		jobs.id,
 		jobs.name,
 		customers.name as customer_name,
+		customers.notes as customer_notes,
 		jobs.guid
 	from
 		jobs
