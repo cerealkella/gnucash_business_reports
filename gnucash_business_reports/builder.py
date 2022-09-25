@@ -111,6 +111,30 @@ class GnuCash_Data_Analysis:
             self.all_accounts = df
         return self.all_accounts
 
+    def toml_to_df(self, toml_series: pd.Series, str_to_match: str) -> pd.DataFrame:
+        """Get accounts matching a string to be passed in. Usually contains some
+        toml to parse.
+
+        Make sure to pass a unique and meaningful index for the toml series
+
+        Returns:
+            pd.DataFrame: a dataframe with the matched accounts
+        """
+        column_name = toml_series.name
+        match = toml_series[
+            toml_series.str.contains(str_to_match).replace("\\n", "\n", regex=True)
+            == True
+        ]
+        match = match.drop_duplicates()
+        keys = get_keys(
+            match[0], str_to_match
+        )  # this assumes the first account will have all the keys we need
+        df = match.to_frame()
+        # populate columns into dataframe using keys from get_keys
+        for key in keys:
+            df[key] = df[column_name].apply(lambda x: parse_toml(x, str_to_match, key))
+        return df
+
     def get_commodity_prices(self) -> pd.DataFrame:
         if not self.CACHED_MODE:
             prices = self.pdw.df_fetch(
@@ -164,20 +188,10 @@ class GnuCash_Data_Analysis:
         self.get_all_accounts()
 
         def get_depreciation_accounts() -> pd.DataFrame:
-            depreciation_accounts = self.all_accounts[
-                self.all_accounts["account_notes"]
-                .str.startswith("[Depreciation]")
-                .replace("\\n", "\n", regex=True)
-                == True
-            ]
-            depr_keys = get_keys(
-                depreciation_accounts["account_notes"][0], "Depreciation"
-            )  # this assumes the first account will have all the keys we need
-            # populate depreciation columns into dataframe using keys from get_keys
-            for key in depr_keys:
-                depreciation_accounts[key] = depreciation_accounts[
-                    "account_notes"
-                ].apply(lambda x: parse_toml(x, "Depreciation", key))
+            depreciation_accounts = self.toml_to_df(
+                self.all_accounts["account_notes"],
+                "Depreciation",
+            ).join(self.all_accounts, rsuffix="_acct")
             return depreciation_accounts
 
         def build_depreciation_schedule(
