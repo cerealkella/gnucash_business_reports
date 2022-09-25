@@ -1,0 +1,9 @@
+[Vendor_Details]
+# Will this vendor receive 1099 Forms
+Receive_1099 = true
+# Revenue Percentages for Flexible Lease Agreements
+Corn = 30
+Soybeans = 40
+# Max and Min Rental Amount Per Year
+Max = 300
+Min = 200
