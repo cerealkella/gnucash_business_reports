@@ -123,7 +123,16 @@ class GnuCash_Data_Analysis:
             )
         return self.filter_by_year(prices, "date")
 
-    def get_latest_commodity_bids(self) -> pd.DataFrame:
+    def get_commodity_bids(self, how: str = "mean") -> pd.DataFrame:
+        """gets the commodity bids from the price database in GnuCash
+
+        Args:
+            how (str, optional): Aggregation method - how to aggregate
+            the dataframe. last or mean are common. Defaults to "mean".
+
+        Returns:
+            pd.DataFrame: small df with the grouped and aggregated bids
+        """
         prices = self.get_commodity_prices()  # .set_index("date").sort_index()
         commodity_list = prices["commodity_guid"].unique().tolist()
         prices["cash"] = prices["value_num"] / prices["value_denom"]
@@ -144,7 +153,7 @@ class GnuCash_Data_Analysis:
                 "quote_tz",
             ]
         )
-        return bids.sort_values("date").groupby("commodity_guid").last().reset_index()
+        return bids.sort_values("date").groupby("commodity_guid").agg(how).reset_index()
 
     def build_depreciation_dataframe(self) -> pd.DataFrame:
         """Builds depreciation schedule
@@ -459,7 +468,7 @@ class GnuCash_Data_Analysis:
             self.fetch_transactions(["STOCK"], False), "post_date", True
         )
 
-    def get_commdodity_stock_values(self) -> pd.DataFrame:
+    def get_commodity_stock_values(self) -> pd.DataFrame:
         """_summary_
 
         Returns:
@@ -469,7 +478,7 @@ class GnuCash_Data_Analysis:
             self.get_stock()
             .groupby("commodity_guid")
             .sum(numeric_only=True)
-            .join(self.get_latest_commodity_bids().set_index("commodity_guid"))
+            .join(self.get_commodity_bids(how="last").set_index("commodity_guid"))
         )
         df["balance_sheet_category"] = "Grain"
         df["amt"] = df["qty"] * df["cash"]
@@ -499,7 +508,7 @@ class GnuCash_Data_Analysis:
         )
 
         grain = (
-            self.get_commdodity_stock_values()
+            self.get_commodity_stock_values()
             .groupby("balance_sheet_category")
             .sum(numeric_only=True)
         )
@@ -828,6 +837,9 @@ class GnuCash_Data_Analysis:
 
         df["bu_per_acre"] = round(df["total_bushels"] / df["acres"], 2)
         return df
+
+    def flexible_lease_calculator(self):
+        pass
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
