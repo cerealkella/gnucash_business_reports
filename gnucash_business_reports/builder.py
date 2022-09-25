@@ -404,7 +404,11 @@ class GnuCash_Data_Analysis:
                 self.all_accounts[["finpack_account", "parent_accounts"]],
                 on="account_guid",
             )
-        invoices = self.get_invoices().groupby(["tx_guid", "account_guid"]).sum()
+        invoices = (
+            self.get_invoices()
+            .groupby(["tx_guid", "account_guid"])
+            .sum(numeric_only=True)
+        )
         tx.set_index(["tx_guid", "account_guid"], inplace=True)
         tx = tx.join(invoices[["quantity"]])
         tx["post_date"] = pd.to_datetime(tx["post_date"], yearfirst=True)
@@ -464,7 +468,7 @@ class GnuCash_Data_Analysis:
         df = (
             self.get_stock()
             .groupby("commodity_guid")
-            .sum()
+            .sum(numeric_only=True)
             .join(self.get_latest_commodity_bids().set_index("commodity_guid"))
         )
         df["balance_sheet_category"] = "Grain"
@@ -490,12 +494,14 @@ class GnuCash_Data_Analysis:
         balance_sheet = (
             self.get_balance_sheet_details()
             .groupby("balance_sheet_category")
-            .sum()
+            .sum(numeric_only=True)
             .drop(columns=["quantity"])
         )
 
         grain = (
-            self.get_commdodity_stock_values().groupby("balance_sheet_category").sum()
+            self.get_commdodity_stock_values()
+            .groupby("balance_sheet_category")
+            .sum(numeric_only=True)
         )
         # balance_sheet.loc["Grain"] = (grain["value"][0], grain["qty"][0])
         return pd.concat([balance_sheet, grain])
@@ -605,7 +611,7 @@ class GnuCash_Data_Analysis:
                 (discounts[key] / 100) * balance_sheet.loc[key]["amt"]
             ) / total_shares
 
-        balance_sheet.loc["Total"] = balance_sheet.sum().to_list()
+        balance_sheet.loc["Total"] = balance_sheet.sum(numeric_only=True).to_list()
         return balance_sheet.drop(columns=["qty"])
 
     def get_1099_vendor_report(self):
@@ -727,8 +733,21 @@ class GnuCash_Data_Analysis:
         del pdw_personal
         writer.close()
 
-    def get_rented_acres(self):
-        # drop unnecessary columns
+    def get_rented_acres(self) -> pd.DataFrame:
+        """Get a listing of all landowners and the farms they are leasing
+        Data input into GnuCash is important for this to work properly.
+
+        This function will filter to project entries only.
+        "Project" is one of three dropdown choices available in GNUCash
+        when creating bills with entries. The others being "Hours" and
+        Material". When entering these values in the system, it's
+        important "Project" for Base Rent payments, as it will
+        differentiate between the base rent and bonus rent.
+
+        Returns:
+            pd.DataFrame: df listing the pertinent information for
+            land rent. Used to calculate acreage and production.
+        """
         df = (
             self.get_invoices()
             .drop(
@@ -739,42 +758,84 @@ class GnuCash_Data_Analysis:
 
         cash_rent = df["account_code"].isin(["424b", "424c"])
 
-        # Filter to project only. "Project" is one of three dropdown
-        # choices available in GNUCash The others being "Hours" and
-        # "Material". When entering these values in the system, it's
-        # important "Project" for Base Rent payments, as it will
-        # differentiate between the base rent and bonus rent.
         base_only = df["quantity_type"] == "Project"
         df = (
             df[cash_rent & base_only]
             .groupby(["crop", "operation", "operation_id", "org_name"])[
-                "quantity", "amt"
+                ["quantity", "amt"]
             ]
-            .sum()
+            .sum(numeric_only=True)
             .round(2)
             .rename(index=str, columns={"quantity": "acres"})
         )
         df["base_rent"] = round(df["amt"] / df["acres"])
-        # grouped_inv.head(12)
         return df
 
-    def get_planted_acres(self) -> pd.DataFrame:
+    def get_planted_acres(self, include_operation_id: bool = False) -> pd.DataFrame:
+        """Pull the acreage planted for the year
+
+        Args:
+            include_operation_id (bool, optional): whether or not to include operation_id
+            which may have indexing and aggregation implications. Defaults to False.
+
+        Returns:
+            pd.DataFrame: dataframe including acreage data
+        """
+        if include_operation_id == True:
+            columns_to_drop = ["org_name", "amt", "base_rent"]
+            groupby_columns = ["crop", "operation", "operation_id"]
+        else:
+            columns_to_drop = ["org_name", "amt", "base_rent", "operation_id"]
+            groupby_columns = ["crop", "operation"]
         return (
             self.get_rented_acres()
             .reset_index()
-            .drop(columns=["org_name", "amt", "base_rent", "operation_id"])
-            .groupby(["crop", "operation"])
-            .sum()
+            .drop(columns=columns_to_drop)
+            .groupby(groupby_columns)
+            .sum(numeric_only=True)
             .round(2)
         )
+
+    def get_production(self) -> pd.DataFrame:
+        """pulls production per field
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        df = (
+            self.get_invoices()
+            .drop(
+                columns=["paytype", "disc_how", "disc_amt", "taxable", "taxincluded"],
+            )
+            .join(self.get_all_accounts(), on="account_guid", rsuffix="_acct")
+        )
+
+        harvest = df["account_code"].isin(["301c", "303b"])
+
+        df = (
+            df[harvest]
+            .groupby(["crop", "operation", "operation_id"])[
+                "quantity",
+            ]
+            .sum(numeric_only=True)
+            .round(2)
+            .rename(index=str, columns={"quantity": "total_bushels"})
+            .join(
+                self.get_planted_acres(include_operation_id=True),
+                rsuffix="_planted",
+            )
+        )
+
+        df["bu_per_acre"] = round(df["total_bushels"] / df["acres"], 2)
+        return df
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
         tx = self.get_farm_cash_transactions()
 
         # *** TOTALS ***
-        account_totals = tx.groupby(["account_type"]).sum()
-        net_cash_flow = round(account_totals.sum()[0], 2)
+        account_totals = tx.groupby(["account_type"]).sum(numeric_only=True)
+        net_cash_flow = round(account_totals.sum(numeric_only=True)[0], 2)
         account_totals.loc["TOTAL (NET)"] = net_cash_flow
 
         last_year_mask = all_tx["post_date"].dt.year < self.year
@@ -786,12 +847,21 @@ class GnuCash_Data_Analysis:
 
         # Get ending checking balances, ensure consistency with
         # Balance Sheet from GNUCash
-        ending_chk_bal = round(all_tx[chk_mask & year_mask]["amt"].sum(), 2)
-        ending_ap_bal = round(all_tx[ap_mask & year_mask]["amt"].sum(), 2)
-        ending_ar_bal = round(all_tx[ar_mask & year_mask]["amt"].sum(), 2)
-        last_year_bal = round(all_tx[chk_mask & last_year_mask]["amt"].sum(), 2)
+        ending_chk_bal = round(
+            all_tx[chk_mask & year_mask]["amt"].sum(numeric_only=True), 2
+        )
+        ending_ap_bal = round(
+            all_tx[ap_mask & year_mask]["amt"].sum(numeric_only=True), 2
+        )
+        ending_ar_bal = round(
+            all_tx[ar_mask & year_mask]["amt"].sum(numeric_only=True), 2
+        )
+        last_year_bal = round(
+            all_tx[chk_mask & last_year_mask]["amt"].sum(numeric_only=True), 2
+        )
         last_year_ar_ap_bal = round(
-            all_tx[(ar_mask | ap_mask) & last_year_mask]["amt"].sum(), 2
+            all_tx[(ar_mask | ap_mask) & last_year_mask]["amt"].sum(numeric_only=True),
+            2,
         )
         net_ar_ap = round(ending_ap_bal + ending_ar_bal, 2)
         net = round(net_cash_flow + last_year_ar_ap_bal + last_year_bal - net_ar_ap, 2)
