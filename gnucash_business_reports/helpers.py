@@ -88,5 +88,8 @@ def parse_toml(toml_string: str, section: str, key: str) -> dict:
     Returns:
         dict: dict containing toml
     """
-    toml_dict = tomli.loads(toml_string)
-    return toml_dict[section][key]
+    try:
+        toml_dict = tomli.loads(toml_string)
+        return toml_dict[section][key]
+    except tomli.TOMLDecodeError:
+        return None
