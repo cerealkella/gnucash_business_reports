@@ -1,5 +1,6 @@
+# Place this TOML in the Notes field for a Vendor in GnuCash
 [Vendor_Details]
-# Will this vendor receive 1099 Forms
+# Will this vendor receive 1099 Forms?
 Receive_1099 = true
 # Revenue Percentages for Flexible Lease Agreements
 Corn = 30
