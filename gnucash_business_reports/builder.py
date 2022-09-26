@@ -180,7 +180,7 @@ class GnuCash_Data_Analysis:
         return (
             bids.sort_values("date")
             .groupby(["commodity_guid", "fullname"])
-            .agg(how)
+            .agg(how, numeric_only=True)
             .reset_index()
             .rename(columns={"fullname": "crop"})
         )
