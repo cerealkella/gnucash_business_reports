@@ -125,7 +125,7 @@ class GnuCash_Data_Analysis:
             toml_series.str.contains(str_to_match).replace("\\n", "\n", regex=True)
             == True
         ]
-        match = match.drop_duplicates()
+        match = match[match.index.drop_duplicates()]  # match.drop_duplicates()
         keys = get_keys(
             match[0], str_to_match
         )  # this assumes the first account will have all the keys we need
@@ -177,7 +177,13 @@ class GnuCash_Data_Analysis:
                 "quote_tz",
             ]
         )
-        return bids.sort_values("date").groupby("commodity_guid").agg(how).reset_index()
+        return (
+            bids.sort_values("date")
+            .groupby(["commodity_guid", "fullname"])
+            .agg(how)
+            .reset_index()
+            .rename(columns={"fullname": "crop"})
+        )
 
     def build_depreciation_dataframe(self) -> pd.DataFrame:
         """Builds depreciation schedule
@@ -852,8 +858,65 @@ class GnuCash_Data_Analysis:
         df["bu_per_acre"] = round(df["total_bushels"] / df["acres"], 2)
         return df
 
-    def flexible_lease_calculator(self):
-        pass
+    def flexible_lease_calculator(self) -> pd.DataFrame:
+        """Calculates Flexible Lease arrangements with data from GnuCash
+        First parses TOML from Vendor Notes to get Lease terms and percentages
+        Uses Rental Invoices to determine acres and Production data for yield.
+        All Grain elevator bids are entered in to GnuCash as well, which is used
+        to calculate average grain prices
+
+        Returns:
+            pd.DataFrame: df containing the calculated Cash rent bonuses for a given
+            year.
+        """
+        terms = self.get_invoices().set_index("operation_id")["org_notes"]
+        terms = terms[terms.index.drop_duplicates()]
+        terms = self.toml_to_df(terms, "Vendor_Details")
+
+        df = terms.reset_index().drop(columns=["org_notes", "Receive_1099", "Min"])
+        df = (
+            df.melt(
+                id_vars=["operation_id", "Max"],
+                var_name="crop",
+                value_name="Percentage",
+            )
+            .drop_duplicates()
+            .set_index(["operation_id", "crop"], drop=True)
+        )
+
+        rental = (
+            self.get_rented_acres()
+            .join(self.get_production().drop(columns="acres"))
+            .reset_index()
+            .set_index(["operation_id", "crop"])
+            .join(self.get_commodity_bids().set_index("crop"))
+            .rename(columns={"cash": "price"})
+        )
+        df = (
+            rental.join(df, how="inner")
+            .reset_index()
+            .rename(columns={"Max": "rent_cap"})
+        )
+        df["rev_pct"] = df["Percentage"] / 100
+
+        df["revenue"] = round(df["bu_per_acre"] * df["price"], 2)
+        df["capped_total"] = round(df["rent_cap"] * df["acres"], 2)
+        df["capped_bonus"] = round(
+            df["capped_total"] - df["base_rent"] * df["acres"], 2
+        )
+        df["raw_bonus"] = round(
+            (
+                (df["revenue"] * df["acres"] * df["rev_pct"])
+                - df["base_rent"] * df["acres"]
+            ),
+            2,
+        )
+        df["bonus"] = df[["raw_bonus", "capped_bonus"]].min(axis=1)
+        df["adj_rent"] = round((df["bonus"] + df["amt"]) / df["acres"], 2)
+        df["price"] = round(df["price"], 2)
+        return df.drop(
+            columns=["amt", "Percentage", "commodity_guid", "operation_id"]
+        ).rename(index=str, columns={"operation": "field", "org_name": "owner"})
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
