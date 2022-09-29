@@ -918,6 +918,104 @@ class GnuCash_Data_Analysis:
             columns=["amt", "Percentage", "commodity_guid", "operation_id"]
         ).rename(index=str, columns={"operation": "field", "org_name": "owner"})
 
+    def check_for_duplicates(self, nums: list, table: str = "TRANSACTIONS") -> list:
+        sql = (
+            f"""SELECT * FROM {table} WHERE NUM IN {[str(x) for x in nums]}""".replace(
+                "[",
+                "(",
+            ).replace("]", ")")
+        )
+        existing_records = self.pdw.df_fetch(sql).set_index("num")
+        return [x for x in existing_records.index.to_list()]
+
+    def process_elevator_load_file(self):
+        self.elevator = get_config()["Elevator"]
+        df = pd.read_csv(
+            self.elevator["loads_path"],
+            parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
+        )
+        df.columns = df.columns.str.strip()
+        tix = list(df["Ticket Number"])
+        self.check_for_duplicates(tix)
+
+        df = (
+            df.groupby(["Ticket Number", "Tare Time Stamp", "Crop Description"])
+            .sum(numeric_only=True)
+            .reset_index()
+            .set_index("Ticket Number")
+        )
+        df["guid"] = ""
+        df["guid"] = df["guid"].apply(lambda v: uuid4().hex)
+        df.index = df.index.map(str)
+        df = df.reset_index().rename(
+            columns={
+                "Ticket Number": "num",
+                "Tare Time Stamp": "post_date",
+            }
+        )
+        commodities = (
+            self.get_commodity_bids()
+            .set_index("crop")
+            .rename(columns={"commodity_guid": "currency_guid"})
+        )
+        df.loc[df["Crop Description"].str.match("CORN"), "crop"] = "Corn"
+        df.loc[df["Crop Description"].str.match("BEANS"), "crop"] = "Soybeans"
+        df = df.join(commodities)
+        df["enter_date"] = datetime.now()
+        df["description"] = self.elevator["elevator_name"]
+        df = df[~df["num"].isin(tix)]  # filter out the txns already entered
+        return df[
+            [
+                "guid",
+                "currency_guid",
+                "num",
+                "post_date",
+                "enter_date",
+                "description",
+                "Net Units",
+            ]
+        ].reset_index(drop=True)
+
+    def create_splits_from_loads(self):
+        splits_buy = self.process_elevator_load_file()[["guid", "Net Units"]]
+        splits_buy.reset_index(inplace=True, drop=True)
+        splits_buy.rename(columns={"guid": "tx_guid"}, inplace=True)
+        splits_buy["guid"] = ""
+        splits_buy["guid"] = splits_buy["guid"].apply(lambda v: uuid4().hex)
+        splits_buy["account_guid"] = self.elevator["grain_to_guid"]
+        splits_buy["memo"] = "imported from CSV"
+        splits_buy["action"] = "Buy"
+        splits_buy["reconcile_state"] = "n"
+        splits_buy["reconcile_date"] = None
+        splits_buy["value_num"] = round(
+            (splits_buy["Net Units"] * self.elevator["price"] * 100), 2
+        ).astype(int)
+        splits_buy["value_denom"] = 100
+        splits_buy["quantity_num"] = (splits_buy["Net Units"] * 100).astype(int)
+        splits_buy["quantity_denom"] = 100
+        splits_buy["lot_guid"] = None
+        splits_buy = splits_buy.drop(
+            columns=[
+                "Net Units",
+            ]
+        )
+
+        splits_sell = splits_buy.copy(deep=True)
+        splits_sell["action"] = "Sell"
+        splits_sell["account_guid"] = self.elevator["grain_from_guid"]
+        splits_sell["quantity_num"] = splits_sell["quantity_num"] * -1
+        splits_sell["value_num"] = splits_sell["value_num"] * -1
+        splits_sell["guid"] = splits_sell["guid"].apply(lambda v: uuid4().hex)
+
+        splits = pd.concat([splits_buy, splits_sell])
+        splits.reset_index(inplace=True, drop=True)
+        splits["reconcile_date"] = "1970-01-01 00:00:00"
+        splits["lot_guid"] = None
+
+        assert splits.sum()["value_num"] == 0
+
+        return splits
+
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
         tx = self.get_farm_cash_transactions()
@@ -986,6 +1084,9 @@ class GnuCash_Data_Analysis:
 
 # year = 2022
 # gda = GnuCash_Data_Analysis()
+
+# print(gda.process_elevator_load_file())
+# print(gda.create_splits_from_loads())
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)
 # print(cash_accounts)
