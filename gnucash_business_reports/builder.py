@@ -122,7 +122,9 @@ class GnuCash_Data_Analysis:
         """
         column_name = toml_series.name
         match = toml_series[
-            toml_series.str.contains(str_to_match).replace("\\n", "\n", regex=True)
+            toml_series.str.contains(f"\[{str_to_match}\]").replace(
+                "\\n", "\n", regex=True
+            )
             == True
         ]
         match = match[match.index.drop_duplicates()]  # match.drop_duplicates()
@@ -209,7 +211,11 @@ class GnuCash_Data_Analysis:
             dates = []
             amounts = []
             descriptions = []
+            date_in_service = datetime(date_in_service.year, 12, 31)
             if method == "MO S/L":
+                deduction_month_frequency = 6
+                amount_per_term = basis / (term * 2)
+            elif method == "HY DOB":
                 deduction_month_frequency = 6
                 amount_per_term = basis / (term * 2)
             else:
@@ -281,7 +287,7 @@ class GnuCash_Data_Analysis:
             depreciation_schedule["src_name"] = depreciation_schedule["name"]
             depreciation_schedule["currency_guid"] = ""
             depreciation_schedule["currency_guid"] = uuid4().hex
-            depreciation_schedule["tx_num"] = str(depreciation_schedule.index)
+            depreciation_schedule["tx_num"] = depreciation_schedule.index
             depreciation_schedule["tx_guid"] = ""
             depreciation_schedule["tx_guid"] = depreciation_schedule["tx_guid"].apply(
                 lambda v: uuid4().hex
@@ -291,8 +297,8 @@ class GnuCash_Data_Analysis:
             depreciation_schedule["split_guid"] = depreciation_schedule[
                 "split_guid"
             ].apply(lambda v: uuid4().hex)
-            depreciation_schedule["enter_date"] = datetime.now().date
-            depreciation_schedule["reconcile_date"] = datetime.now().date
+            depreciation_schedule["enter_date"] = datetime.now()
+            depreciation_schedule["reconcile_date"] = datetime.now()
             depreciation_schedule["reconcile_state"] = ""
             depreciation_schedule["memo"] = depreciation_schedule["name"]
             # depreciation_schedule["qty"] = 1.0
@@ -642,6 +648,30 @@ class GnuCash_Data_Analysis:
 
         balance_sheet.loc["Total"] = balance_sheet.sum(numeric_only=True).to_list()
         return balance_sheet.drop(columns=["qty"])
+
+    def get_executive_summary(self):
+
+        df = (
+            self.get_farm_cash_transactions(include_depreciation=True)
+            .reset_index(drop=True)
+            .sort_values(by=["account_code", "post_date"])
+            .groupby("account_type")
+            .sum(numeric_only=True)
+            .drop(columns="quantity")
+        )
+
+        df["order"] = 100
+        df.loc["INCOME", "order"] = 10
+        df.loc["EXPENSE", "order"] = 20
+        df.loc["OIBDA", "order"] = 30
+        df.loc["OIBDA", "amt"] = df.loc["INCOME", "amt"] + df.loc["EXPENSE", "amt"]
+        df.loc["DEPRECIATION", "order"] = 40
+        df.loc["NET INCOME", "order"] = 50
+        df.loc["NET INCOME", "amt"] = (
+            df.loc["OIBDA", "amt"] + df.loc["DEPRECIATION", "amt"]
+        )
+
+        return df.sort_values("order")[:5].reset_index().reindex().drop(columns="order")
 
     def get_1099_vendor_report(self):
         """Pulls 1099 Vendors from database and drops the data in an
