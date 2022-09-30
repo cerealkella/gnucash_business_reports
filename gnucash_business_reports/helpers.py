@@ -1,3 +1,4 @@
+from datetime import datetime
 from pandas import DataFrame
 import tomli
 
@@ -93,3 +94,20 @@ def parse_toml(toml_string: str, section: str, key: str) -> dict:
         return toml_dict[section][key]
     except tomli.TOMLDecodeError:
         return None
+
+
+def nearest(items: list, pivot: datetime) -> datetime:
+    """Function to find the nearest date in a list of dates
+    Obligatory hat tip to StackOverflow
+    https://stackoverflow.com/questions/32237862/find-the-closest-date-to-a-given-date
+
+    Args:
+        items (list): list of dates (typically from a pandas df
+        using the .tolist() function)
+        pivot (datetime): date for which you'd like to find the nearest
+        value
+
+    Returns:
+        datetime: the date nearest, which can then be used for indexing purposes.
+    """
+    return min(items, key=lambda x: abs(x - pivot))

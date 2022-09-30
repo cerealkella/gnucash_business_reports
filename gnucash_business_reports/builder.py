@@ -6,7 +6,7 @@ from jinja2 import Environment, FileSystemLoader
 from dateutil.relativedelta import relativedelta
 from uuid import uuid4
 from .config import get_datadir, get_gnucash_file_path, get_config
-from .helpers import get_keys, parse_toml
+from .helpers import get_keys, parse_toml, nearest
 
 
 class GnuCash_Data_Analysis:
@@ -148,6 +148,32 @@ class GnuCash_Data_Analysis:
                 f"{self.data_directory}/PRICES.csv", parse_dates=["date"]
             )
         return self.filter_by_year(prices, "date")
+
+    def get_nearest_commodity_bid(self, commodity: str, date: datetime) -> float:
+        """Get the nearest bid for a given commodity (e.g. Corn, Soybeans)
+
+        Args:
+            commodity (str): Commodity by which to filter
+            date (datetime): date to search by
+
+        Returns:
+            float: price of the commodity around that date
+        """
+        # not using the get_commodity_prices function because we don't want to
+        # filter on date by year
+        prices = self.pdw.df_fetch(
+            self.pdw.read_sql_file("sql/prices.sql"), parse_dates=["date"]
+        ).set_index("date")
+        bids_mask = prices["type"].str.match("bid")
+        commodity_mask = prices["fullname"].str.match(commodity.title())
+        prices = prices[bids_mask & commodity_mask]
+        nearest_bid_date = nearest(prices.index.tolist(), date)
+        print(f"found a nearby date: {nearest_bid_date}")
+        return round(
+            prices.loc[nearest_bid_date]["value_num"]
+            / prices.loc[nearest_bid_date]["value_denom"],
+            2,
+        )
 
     def get_commodity_bids(self, how: str = "mean") -> pd.DataFrame:
         """gets the commodity bids from the price database in GnuCash
@@ -1138,3 +1164,14 @@ class GnuCash_Data_Analysis:
 # all_accounts = gda.get_all_accounts()
 # commodities = all_accounts["commodity_guid"].unique()
 # print(commodities.tolist())
+
+
+# price = gda.get_commodity_prices().drop_duplicates().set_index("date", "fullname")
+# dt = datetime(2022, 9, 14)
+
+# soybeans = price[price["fullname"] == "soybeans"]
+# print(nearest(price.index.tolist(), dt))
+# print(gda.get_commodity_bids())
+
+# print(gda.get_commodity_prices().dtypes)
+# print(gda.get_nearest_commodity_bid("SOYBEANS", datetime(2020, 7, 4)))
