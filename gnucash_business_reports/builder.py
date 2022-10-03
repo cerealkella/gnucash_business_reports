@@ -974,28 +974,80 @@ class GnuCash_Data_Analysis:
             columns=["amt", "Percentage", "commodity_guid", "operation_id"]
         ).rename(index=str, columns={"operation": "field", "org_name": "owner"})
 
-    def check_for_duplicates(self, nums: list, table: str = "TRANSACTIONS") -> list:
-        sql = (
-            f"""SELECT * FROM {table} WHERE NUM IN {[str(x) for x in nums]}""".replace(
-                "[",
-                "(",
-            ).replace("]", ")")
+    def get_existing_records(
+        self, identifiers: list, table: str = "TRANSACTIONS", column: str = "num"
+    ) -> list:
+        sql = f"""SELECT * FROM {table} WHERE {column} IN {[str(x) for x in identifiers]}""".replace(
+            "[",
+            "(",
+        ).replace(
+            "]", ")"
         )
-        existing_records = self.pdw.df_fetch(sql).set_index("num")
-        return [x for x in existing_records.index.to_list()]
+        return self.pdw.df_fetch(sql).set_index(column)
+        # return [x for x in existing_records.index.to_list()]
 
-    def process_elevator_load_file(self):
+    def get_joplin_notes(self, ticket_nums: list):
+        pdw_joplin = pd_db_wrangler.Pandas_DB_Wrangler()
+        pdw_joplin.set_connection_string(self.elevator["joplin_db"], db_type="sqlite")
+        sql = f"""SELECT id as joplin_id, title FROM notes WHERE title IN {["Scale Ticket " + str(x) for x in ticket_nums]}""".replace(
+            "[",
+            "(",
+        ).replace(
+            "]", ")"
+        )
+        joplin_notes = pdw_joplin.df_fetch(sql)
+        joplin_notes["Ticket Number"] = joplin_notes["title"].str.replace(
+            "Scale Ticket ", ""
+        )
+        del pdw_joplin
+        print(joplin_notes)
+        return joplin_notes.set_index("Ticket Number").drop(columns="title")
+
+    def get_associated_uris(self, tx_df: pd.DataFrame):
+        """find existing assoc_uris from db"""
+
+        def build_slots_df():
+            df = tx_df.join(self.get_joplin_notes(tx_df.index.tolist()))
+            slots = df[["guid", "joplin_id"]]
+
+            slots["name"] = "assoc_uri"
+            slots["slot_type"] = 4
+            slots["int64_val"] = 0
+            slots["string_val"] = (
+                self.elevator["joplin_uri_prefix"] + slots["joplin_id"]
+            )
+            slots.drop(columns="joplin_id", inplace=True)
+            slots["timespec_val"] = "1970-01-01 00:00:00"
+            slots["numeric_val_num"] = 0
+            slots["numeric_val_denom"] = 1
+            print(slots)
+            return slots.dropna().rename(columns={"guid": "obj_guid"})
+
+        df = self.get_existing_records(
+            identifiers=tx_df.reset_index().set_index("guid").index.tolist(),
+            table="slots",
+            column="obj_guid",
+        )
+        print(build_slots_df())
+        print(df[df["name"] == "assoc_uri"])
+        df = df[df["name"] == "assoc_uri"].join(tx_df.set_index("guid"))
+        print(df)
+        # df_nope = df[~df["num"].isin(df["Ticket Number"])]
+        # print(df_nope)
+
+    def read_loads_from_file(self):
         self.elevator = get_config()["Elevator"]
         df = pd.read_csv(
             self.elevator["loads_path"],
             parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
         )
         df.columns = df.columns.str.strip()
-        tix = list(df["Ticket Number"])
-        self.check_for_duplicates(tix)
+        return df
 
+    def get_elevator_loads_with_commodity_ids(self):
         df = (
-            df.groupby(["Ticket Number", "Tare Time Stamp", "Crop Description"])
+            self.read_loads_from_file()
+            .groupby(["Ticket Number", "Tare Time Stamp", "Crop Description"])
             .sum(numeric_only=True)
             .reset_index()
             .set_index("Ticket Number")
@@ -1009,17 +1061,24 @@ class GnuCash_Data_Analysis:
                 "Tare Time Stamp": "post_date",
             }
         )
+        df.loc[df["Crop Description"].str.match("CORN"), "crop"] = "Corn"
+        df.loc[df["Crop Description"].str.match("BEANS"), "crop"] = "Soybeans"
         commodities = (
             self.get_commodity_bids()
             .set_index("crop")
             .rename(columns={"commodity_guid": "currency_guid"})
         )
-        df.loc[df["Crop Description"].str.match("CORN"), "crop"] = "Corn"
-        df.loc[df["Crop Description"].str.match("BEANS"), "crop"] = "Soybeans"
         df = df.join(commodities)
         df["enter_date"] = datetime.now()
         df["description"] = self.elevator["elevator_name"]
-        df = df[~df["num"].isin(tix)]  # filter out the txns already entered
+        return df
+
+    def process_elevator_load_file(self):
+        df = self.get_elevator_loads_with_commodity_ids()
+        print(df)
+        entered_tx_df = self.get_existing_records(df["num"].tolist())
+        entered_tix = entered_tx_df.index.tolist()
+        df = df[~df["num"].isin(entered_tix)]  # filter out the txns already entered
         return df[
             [
                 "guid",
@@ -1139,9 +1198,9 @@ class GnuCash_Data_Analysis:
 
 
 # year = 2022
-# gda = GnuCash_Data_Analysis()
+gda = GnuCash_Data_Analysis()
 
-# print(gda.process_elevator_load_file())
+print(gda.process_elevator_load_file())
 # print(gda.create_splits_from_loads())
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)
