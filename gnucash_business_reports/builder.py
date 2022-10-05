@@ -1149,20 +1149,12 @@ class GnuCash_Data_Analysis:
 
         # Get ending checking balances, ensure consistency with
         # Balance Sheet from GNUCash
-        ending_chk_bal = round(
-            all_tx[chk_mask & year_mask]["amt"].sum(numeric_only=True), 2
-        )
-        ending_ap_bal = round(
-            all_tx[ap_mask & year_mask]["amt"].sum(numeric_only=True), 2
-        )
-        ending_ar_bal = round(
-            all_tx[ar_mask & year_mask]["amt"].sum(numeric_only=True), 2
-        )
-        last_year_bal = round(
-            all_tx[chk_mask & last_year_mask]["amt"].sum(numeric_only=True), 2
-        )
+        ending_chk_bal = round(all_tx[chk_mask & year_mask]["amt"].sum(), 2)
+        ending_ap_bal = round(all_tx[ap_mask & year_mask]["amt"].sum(), 2)
+        ending_ar_bal = round(all_tx[ar_mask & year_mask]["amt"].sum(), 2)
+        last_year_bal = round(all_tx[chk_mask & last_year_mask]["amt"].sum(), 2)
         last_year_ar_ap_bal = round(
-            all_tx[(ar_mask | ap_mask) & last_year_mask]["amt"].sum(numeric_only=True),
+            all_tx[(ar_mask | ap_mask) & last_year_mask]["amt"].sum(),
             2,
         )
         net_ar_ap = round(ending_ap_bal + ending_ar_bal, 2)
@@ -1198,9 +1190,11 @@ class GnuCash_Data_Analysis:
 
 
 # year = 2022
-gda = GnuCash_Data_Analysis()
+# gda = GnuCash_Data_Analysis()
 
-print(gda.process_elevator_load_file())
+# print(gda.process_elevator_load_file())
+# gda.sanity_checker()
+
 # print(gda.create_splits_from_loads())
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)
