@@ -153,7 +153,7 @@ class GnuCash_Data_Analysis:
         """Get the nearest bid for a given commodity (e.g. Corn, Soybeans)
 
         Args:
-            commodity (str): Commodity by which to filter
+            commodity (str): Commodity by which to filter, may pass a guid or name
             date (datetime): date to search by
 
         Returns:
@@ -165,7 +165,13 @@ class GnuCash_Data_Analysis:
             self.pdw.read_sql_file("sql/prices.sql"), parse_dates=["date"]
         ).set_index("date")
         bids_mask = prices["type"].str.match("bid")
-        commodity_mask = prices["fullname"].str.match(commodity.title())
+        guid_list = type(prices["commodity_guid"].drop_duplicates().tolist())
+        print(type(commodity))
+        print(commodity in guid_list)
+        if commodity in (prices["commodity_guid"].drop_duplicates().tolist()):
+            commodity_mask = prices["commodity_guid"].str.match(commodity)
+        else:
+            commodity_mask = prices["fullname"].str.match(commodity.title())
         prices = prices[bids_mask & commodity_mask]
         nearest_bid_date = nearest(prices.index.tolist(), date)
         print(f"found a nearby date: {nearest_bid_date}")
@@ -1091,8 +1097,12 @@ class GnuCash_Data_Analysis:
             ]
         ].reset_index(drop=True)
 
-    def create_splits_from_loads(self):
-        splits_buy = self.process_elevator_load_file()[["guid", "Net Units"]]
+    def create_db_records_from_load_file(self, write_to_db: bool = False):
+        transactions = self.process_elevator_load_file()
+        splits_buy = transactions[
+            ["guid", "Net Units"]
+        ]  # , "currency_guid", "enter_date"]]
+        transactions.drop(columns="Net Units", inplace=True)
         splits_buy.reset_index(inplace=True, drop=True)
         splits_buy.rename(columns={"guid": "tx_guid"}, inplace=True)
         splits_buy["guid"] = ""
@@ -1102,8 +1112,10 @@ class GnuCash_Data_Analysis:
         splits_buy["action"] = "Buy"
         splits_buy["reconcile_state"] = "n"
         splits_buy["reconcile_date"] = None
+        # todo: make this more dynamic
+        price = 14.0  # temporary
         splits_buy["value_num"] = round(
-            (splits_buy["Net Units"] * self.elevator["price"] * 100), 2
+            (splits_buy["Net Units"] * price * 100), 2
         ).astype(int)
         splits_buy["value_denom"] = 100
         splits_buy["quantity_num"] = (splits_buy["Net Units"] * 100).astype(int)
@@ -1129,7 +1141,18 @@ class GnuCash_Data_Analysis:
 
         assert splits.sum()["value_num"] == 0
 
-        return splits
+        print(transactions)
+        print(splits)
+        if write_to_db:
+            # Warning: be sure about this!
+            transactions.to_sql(
+                "transactions", con=engine, if_exists="append", index=False
+            )
+            splits.to_sql("splits", con=engine, if_exists="append", index=False)
+            # slots.to_sql('slots', con=engine, if_exists='append', index=False)
+            print("Updated Database!")
+        else:
+            pass
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
@@ -1190,12 +1213,11 @@ class GnuCash_Data_Analysis:
 
 
 # year = 2022
-# gda = GnuCash_Data_Analysis()
+gda = GnuCash_Data_Analysis()
 
-# print(gda.process_elevator_load_file())
 # gda.sanity_checker()
 
-# print(gda.create_splits_from_loads())
+print(gda.create_db_records_from_load_file())
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)
 # print(cash_accounts)
