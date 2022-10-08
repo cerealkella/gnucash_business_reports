@@ -1002,18 +1002,18 @@ class GnuCash_Data_Analysis:
             "]", ")"
         )
         joplin_notes = pdw_joplin.df_fetch(sql)
-        joplin_notes["Ticket Number"] = joplin_notes["title"].str.replace(
+        joplin_notes["num"] = joplin_notes["title"].str.replace(
             "Scale Ticket ", ""
         )
         del pdw_joplin
         print(joplin_notes)
-        return joplin_notes.set_index("Ticket Number").drop(columns="title")
+        return joplin_notes.set_index("num").drop(columns="title")
 
     def get_associated_uris(self, tx_df: pd.DataFrame):
         """find existing assoc_uris from db"""
 
         def build_slots_df():
-            df = tx_df.join(self.get_joplin_notes(tx_df.index.tolist()))
+            df = tx_df.join(self.get_joplin_notes(tx_df["num"].tolist()), on="num")
             slots = df[["guid", "joplin_id"]]
 
             slots["name"] = "assoc_uri"
@@ -1026,7 +1026,6 @@ class GnuCash_Data_Analysis:
             slots["timespec_val"] = "1970-01-01 00:00:00"
             slots["numeric_val_num"] = 0
             slots["numeric_val_denom"] = 1
-            print(slots)
             return slots.dropna().rename(columns={"guid": "obj_guid"})
 
         df = self.get_existing_records(
@@ -1074,14 +1073,13 @@ class GnuCash_Data_Analysis:
             .set_index("crop")
             .rename(columns={"commodity_guid": "currency_guid"})
         )
-        df = df.join(commodities)
+        df = df.join(commodities, on="crop")
         df["enter_date"] = datetime.now()
         df["description"] = self.elevator["elevator_name"]
         return df
 
     def process_elevator_load_file(self):
         df = self.get_elevator_loads_with_commodity_ids()
-        print(df)
         entered_tx_df = self.get_existing_records(df["num"].tolist())
         entered_tix = entered_tx_df.index.tolist()
         df = df[~df["num"].isin(entered_tix)]  # filter out the txns already entered
@@ -1094,13 +1092,14 @@ class GnuCash_Data_Analysis:
                 "enter_date",
                 "description",
                 "Net Units",
+                "cash",
             ]
         ].reset_index(drop=True)
 
     def create_db_records_from_load_file(self, write_to_db: bool = False):
         transactions = self.process_elevator_load_file()
         splits_buy = transactions[
-            ["guid", "Net Units"]
+            ["guid", "Net Units", "cash"]
         ]  # , "currency_guid", "enter_date"]]
         transactions.drop(columns="Net Units", inplace=True)
         splits_buy.reset_index(inplace=True, drop=True)
@@ -1115,7 +1114,7 @@ class GnuCash_Data_Analysis:
         # todo: make this more dynamic
         price = 14.0  # temporary
         splits_buy["value_num"] = round(
-            (splits_buy["Net Units"] * price * 100), 2
+            (splits_buy["Net Units"] * splits_buy["cash"] * 100), 2
         ).astype(int)
         splits_buy["value_denom"] = 100
         splits_buy["quantity_num"] = (splits_buy["Net Units"] * 100).astype(int)
@@ -1124,6 +1123,7 @@ class GnuCash_Data_Analysis:
         splits_buy = splits_buy.drop(
             columns=[
                 "Net Units",
+                "cash",
             ]
         )
 
@@ -1143,6 +1143,9 @@ class GnuCash_Data_Analysis:
 
         print(transactions)
         print(splits)
+
+        slots = self.get_associated_uris(transactions)
+
         if write_to_db:
             # Warning: be sure about this!
             transactions.to_sql(
