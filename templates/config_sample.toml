@@ -23,6 +23,12 @@ Grain = 70
 elevator_name = "Farmers Coop"
 loads_path = "/home/user/Downloads/download99999.CSV"
 
+# used for scraping the loads CSV from elevator website
+# need to store password in keyring using
+# keyring set elevator [username] [password]
+webpage = "https://mylocalgrainelevator.biz"
+username = "my_username"
+
 # used for storing images of receipts
 joplin_db = "/home/user/.config/joplin-desktop/database.sqlite"
 joplin_uri_prefix = "joplin://x-callback-url/openNote?id="
