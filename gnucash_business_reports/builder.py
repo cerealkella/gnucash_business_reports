@@ -5,6 +5,7 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from dateutil.relativedelta import relativedelta
 from uuid import uuid4
+from sqlalchemy import create_engine
 from .config import get_datadir, get_gnucash_file_path, get_config
 from .helpers import get_keys, parse_toml, nearest
 
@@ -22,6 +23,8 @@ class GnuCash_Data_Analysis:
         pd.set_option("display.float_format", lambda x: "%.2f" % x)
         self.pdw = pd_db_wrangler.Pandas_DB_Wrangler()
         self.pdw.set_connection_string(get_gnucash_file_path(), db_type="sqlite")
+        # Unix/Mac - 4 initial slashes in total
+        self.engine = create_engine(f'sqlite:////{get_gnucash_file_path()}')
 
     def filter_by_year(
         self, df: pd.DataFrame, column: str, all_years_plus_specified: bool = False
@@ -198,7 +201,6 @@ class GnuCash_Data_Analysis:
             columns=[
                 "guid",
                 "source",
-                "currency_guid",
                 "source",
                 "type",
                 "value_num",
@@ -213,7 +215,7 @@ class GnuCash_Data_Analysis:
         )
         return (
             bids.sort_values("date")
-            .groupby(["commodity_guid", "fullname"])
+            .groupby(["commodity_guid", "fullname", "currency_guid"])
             .agg(how, numeric_only=True)
             .reset_index()
             .rename(columns={"fullname": "crop"})
@@ -1033,10 +1035,12 @@ class GnuCash_Data_Analysis:
             table="slots",
             column="obj_guid",
         )
-        print(build_slots_df())
-        print(df[df["name"] == "assoc_uri"])
-        df = df[df["name"] == "assoc_uri"].join(tx_df.set_index("guid"))
-        print(df)
+        slots = build_slots_df()
+        print(slots)
+        # print(df[df["name"] == "assoc_uri"])
+        # df = df[df["name"] == "assoc_uri"].join(tx_df.set_index("guid"))
+        # print(df)
+        return slots
         # df_nope = df[~df["num"].isin(df["Ticket Number"])]
         # print(df_nope)
 
@@ -1071,7 +1075,6 @@ class GnuCash_Data_Analysis:
         commodities = (
             self.get_commodity_bids()
             .set_index("crop")
-            .rename(columns={"commodity_guid": "currency_guid"})
         )
         df = df.join(commodities, on="crop")
         df["enter_date"] = datetime.now()
@@ -1101,7 +1104,7 @@ class GnuCash_Data_Analysis:
         splits_buy = transactions[
             ["guid", "Net Units", "cash"]
         ]  # , "currency_guid", "enter_date"]]
-        transactions.drop(columns="Net Units", inplace=True)
+        transactions.drop(columns=["Net Units", "cash"], inplace=True)
         splits_buy.reset_index(inplace=True, drop=True)
         splits_buy.rename(columns={"guid": "tx_guid"}, inplace=True)
         splits_buy["guid"] = ""
@@ -1111,8 +1114,6 @@ class GnuCash_Data_Analysis:
         splits_buy["action"] = "Buy"
         splits_buy["reconcile_state"] = "n"
         splits_buy["reconcile_date"] = None
-        # todo: make this more dynamic
-        price = 14.0  # temporary
         splits_buy["value_num"] = round(
             (splits_buy["Net Units"] * splits_buy["cash"] * 100), 2
         ).astype(int)
@@ -1141,18 +1142,21 @@ class GnuCash_Data_Analysis:
 
         assert splits.sum()["value_num"] == 0
 
+        print("***TRANSACTIONS***")
         print(transactions)
+        print("***SPLITS***")
         print(splits)
-
         slots = self.get_associated_uris(transactions)
+        print("***SLOTS***")
+        print(slots)
 
         if write_to_db:
             # Warning: be sure about this!
             transactions.to_sql(
-                "transactions", con=engine, if_exists="append", index=False
+                "transactions", con=self.engine, if_exists="append", index=False
             )
-            splits.to_sql("splits", con=engine, if_exists="append", index=False)
-            # slots.to_sql('slots', con=engine, if_exists='append', index=False)
+            splits.to_sql("splits", con=self.engine, if_exists="append", index=False)
+            slots.to_sql('slots', con=self.engine, if_exists='append', index=False)
             print("Updated Database!")
         else:
             pass
@@ -1220,6 +1224,7 @@ gda = GnuCash_Data_Analysis()
 
 # gda.sanity_checker()
 
+# print(gda.create_db_records_from_load_file(write_to_db=True))
 print(gda.create_db_records_from_load_file())
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)
