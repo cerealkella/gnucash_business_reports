@@ -28,6 +28,9 @@ loads_path = "/home/user/Downloads/download99999.CSV"
 # keyring set elevator [username] [password]
 webpage = "https://mylocalgrainelevator.biz"
 username = "my_username"
+# look only for files matching the beginning characters
+# specified in the file_match_pattern setting specified
+file_match_pattern = "XYDL"
 
 # used for storing images of receipts
 joplin_db = "/home/user/.config/joplin-desktop/database.sqlite"
