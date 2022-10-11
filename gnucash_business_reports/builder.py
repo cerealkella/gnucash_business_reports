@@ -24,7 +24,7 @@ class GnuCash_Data_Analysis:
         self.pdw = pd_db_wrangler.Pandas_DB_Wrangler()
         self.pdw.set_connection_string(get_gnucash_file_path(), db_type="sqlite")
         # Unix/Mac - 4 initial slashes in total
-        self.engine = create_engine(f'sqlite:////{get_gnucash_file_path()}')
+        self.engine = create_engine(f"sqlite:////{get_gnucash_file_path()}")
 
     def filter_by_year(
         self, df: pd.DataFrame, column: str, all_years_plus_specified: bool = False
@@ -1004,9 +1004,7 @@ class GnuCash_Data_Analysis:
             "]", ")"
         )
         joplin_notes = pdw_joplin.df_fetch(sql)
-        joplin_notes["num"] = joplin_notes["title"].str.replace(
-            "Scale Ticket ", ""
-        )
+        joplin_notes["num"] = joplin_notes["title"].str.replace("Scale Ticket ", "")
         del pdw_joplin
         print(joplin_notes)
         return joplin_notes.set_index("num").drop(columns="title")
@@ -1072,17 +1070,41 @@ class GnuCash_Data_Analysis:
         )
         df.loc[df["Crop Description"].str.match("CORN"), "crop"] = "Corn"
         df.loc[df["Crop Description"].str.match("BEANS"), "crop"] = "Soybeans"
-        commodities = (
-            self.get_commodity_bids()
-            .set_index("crop")
-        )
+        commodities = self.get_commodity_bids().set_index("crop")
         df = df.join(commodities, on="crop")
         df["enter_date"] = datetime.now()
         df["description"] = self.elevator["elevator_name"]
         return df
 
-    def process_elevator_load_file(self):
+    def get_split_accounts(self, search_term: str) -> pd.Series:
+        """Function to find split accounts for a given search term
+
+        Args:
+            search_term (str): search term used for filtering accounts
+            e.g. "Harvested" for harvested grain
+
+        Returns:
+            pd.Series: returns a pandas series indexed by commodity_guid
+        """
+        self.get_all_accounts()
+        df = self.all_accounts.loc[
+            self.all_accounts["parent_accounts"].str.contains(search_term)
+        ]
+        return df.reset_index().set_index("commodity_guid")["guid"]
+
+    def process_elevator_load_file(self) -> pd.DataFrame:
+        """Function to process a CSV list of loads downloaded from
+        an elevator account
+
+        Returns:
+            pd.DataFrame: Dataframe containing the minimum columns
+            needed to generated transactions and splits (some of the
+            columns will be dropped later)
+        """
         df = self.get_elevator_loads_with_commodity_ids()
+        from_df = self.get_split_accounts("Harvested").rename("from_guid")
+        to_df = self.get_split_accounts("Delivered").rename("to_guid")
+        df = df.join(from_df, on="commodity_guid").join(to_df, on="commodity_guid")
         entered_tx_df = self.get_existing_records(df["num"].tolist())
         entered_tix = entered_tx_df.index.tolist()
         df = df[~df["num"].isin(entered_tix)]  # filter out the txns already entered
@@ -1096,20 +1118,27 @@ class GnuCash_Data_Analysis:
                 "description",
                 "Net Units",
                 "cash",
+                "from_guid",
+                "to_guid",
             ]
         ].reset_index(drop=True)
 
     def create_db_records_from_load_file(self, write_to_db: bool = False):
+        """Build transactions, splits, and slots from a loads file
+        downloaded from an elevator website
+
+        Args:
+            write_to_db (bool, optional): Will write the changes to the
+            database. Defaults to False.
+        """
         transactions = self.process_elevator_load_file()
-        splits_buy = transactions[
-            ["guid", "Net Units", "cash"]
-        ]  # , "currency_guid", "enter_date"]]
+        splits_buy = transactions[["guid", "Net Units", "cash", "to_guid", "from_guid"]]
         transactions.drop(columns=["Net Units", "cash"], inplace=True)
         splits_buy.reset_index(inplace=True, drop=True)
         splits_buy.rename(columns={"guid": "tx_guid"}, inplace=True)
         splits_buy["guid"] = ""
         splits_buy["guid"] = splits_buy["guid"].apply(lambda v: uuid4().hex)
-        splits_buy["account_guid"] = self.elevator["grain_to_guid"]
+        splits_buy["account_guid"] = splits_buy["to_guid"]
         splits_buy["memo"] = "imported from CSV"
         splits_buy["action"] = "Buy"
         splits_buy["reconcile_state"] = "n"
@@ -1130,10 +1159,24 @@ class GnuCash_Data_Analysis:
 
         splits_sell = splits_buy.copy(deep=True)
         splits_sell["action"] = "Sell"
-        splits_sell["account_guid"] = self.elevator["grain_from_guid"]
+        splits_sell["account_guid"] = splits_sell["from_guid"]
         splits_sell["quantity_num"] = splits_sell["quantity_num"] * -1
         splits_sell["value_num"] = splits_sell["value_num"] * -1
         splits_sell["guid"] = splits_sell["guid"].apply(lambda v: uuid4().hex)
+
+        # done with to/from columns, drop 'em
+        splits_buy = splits_buy.drop(
+            columns=[
+                "to_guid",
+                "from_guid",
+            ]
+        )
+        splits_sell = splits_sell.drop(
+            columns=[
+                "to_guid",
+                "from_guid",
+            ]
+        )
 
         splits = pd.concat([splits_buy, splits_sell])
         splits.reset_index(inplace=True, drop=True)
@@ -1156,7 +1199,7 @@ class GnuCash_Data_Analysis:
                 "transactions", con=self.engine, if_exists="append", index=False
             )
             splits.to_sql("splits", con=self.engine, if_exists="append", index=False)
-            slots.to_sql('slots', con=self.engine, if_exists='append', index=False)
+            slots.to_sql("slots", con=self.engine, if_exists="append", index=False)
             print("Updated Database!")
         else:
             pass
@@ -1225,6 +1268,9 @@ gda = GnuCash_Data_Analysis()
 # gda.sanity_checker()
 
 # print(gda.create_db_records_from_load_file(write_to_db=True))
+# print(gda.get_split_accounts("Harvested"))
+# print(gda.get_split_accounts("Delivered"))
+
 print(gda.create_db_records_from_load_file())
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)

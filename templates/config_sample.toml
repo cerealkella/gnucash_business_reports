@@ -35,6 +35,3 @@ file_match_pattern = "XYDL"
 # used for storing images of receipts
 joplin_db = "/home/user/.config/joplin-desktop/database.sqlite"
 joplin_uri_prefix = "joplin://x-callback-url/openNote?id="
-
-grain_from_guid = "53937436c4cb4698a26c0bd8595b7f6c"
-grain_to_guid = "0ffbfd4913ab426d81532d6a06a4b0cd"
