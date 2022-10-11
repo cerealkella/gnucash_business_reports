@@ -1,5 +1,6 @@
 import pandas as pd
 import pd_db_wrangler
+from pathlib import Path
 from tabulate import tabulate
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
@@ -1042,10 +1043,13 @@ class GnuCash_Data_Analysis:
         # df_nope = df[~df["num"].isin(df["Ticket Number"])]
         # print(df_nope)
 
+    def set_load_file(self, filename: str):
+        self.load_file = filename
+
     def read_loads_from_file(self):
         self.elevator = get_config()["Elevator"]
         df = pd.read_csv(
-            self.elevator["loads_path"],
+            self.load_file,
             parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
         )
         df.columns = df.columns.str.strip()
@@ -1123,7 +1127,9 @@ class GnuCash_Data_Analysis:
             ]
         ].reset_index(drop=True)
 
-    def create_db_records_from_load_file(self, write_to_db: bool = False):
+    def create_db_records_from_load_file(
+        self, filename: Path, write_to_db: bool = False
+    ):
         """Build transactions, splits, and slots from a loads file
         downloaded from an elevator website
 
@@ -1131,78 +1137,86 @@ class GnuCash_Data_Analysis:
             write_to_db (bool, optional): Will write the changes to the
             database. Defaults to False.
         """
-        transactions = self.process_elevator_load_file()
-        splits_buy = transactions[["guid", "Net Units", "cash", "to_guid", "from_guid"]]
-        transactions.drop(columns=["Net Units", "cash"], inplace=True)
-        splits_buy.reset_index(inplace=True, drop=True)
-        splits_buy.rename(columns={"guid": "tx_guid"}, inplace=True)
-        splits_buy["guid"] = ""
-        splits_buy["guid"] = splits_buy["guid"].apply(lambda v: uuid4().hex)
-        splits_buy["account_guid"] = splits_buy["to_guid"]
-        splits_buy["memo"] = "imported from CSV"
-        splits_buy["action"] = "Buy"
-        splits_buy["reconcile_state"] = "n"
-        splits_buy["reconcile_date"] = None
-        splits_buy["value_num"] = round(
-            (splits_buy["Net Units"] * splits_buy["cash"] * 100), 2
-        ).astype(int)
-        splits_buy["value_denom"] = 100
-        splits_buy["quantity_num"] = (splits_buy["Net Units"] * 100).astype(int)
-        splits_buy["quantity_denom"] = 100
-        splits_buy["lot_guid"] = None
-        splits_buy = splits_buy.drop(
-            columns=[
-                "Net Units",
-                "cash",
+        try:
+            self.set_load_file(filename)
+            transactions = self.process_elevator_load_file()
+            splits_buy = transactions[
+                ["guid", "Net Units", "cash", "to_guid", "from_guid"]
             ]
-        )
-
-        splits_sell = splits_buy.copy(deep=True)
-        splits_sell["action"] = "Sell"
-        splits_sell["account_guid"] = splits_sell["from_guid"]
-        splits_sell["quantity_num"] = splits_sell["quantity_num"] * -1
-        splits_sell["value_num"] = splits_sell["value_num"] * -1
-        splits_sell["guid"] = splits_sell["guid"].apply(lambda v: uuid4().hex)
-
-        # done with to/from columns, drop 'em
-        splits_buy = splits_buy.drop(
-            columns=[
-                "to_guid",
-                "from_guid",
-            ]
-        )
-        splits_sell = splits_sell.drop(
-            columns=[
-                "to_guid",
-                "from_guid",
-            ]
-        )
-
-        splits = pd.concat([splits_buy, splits_sell])
-        splits.reset_index(inplace=True, drop=True)
-        splits["reconcile_date"] = "1970-01-01 00:00:00"
-        splits["lot_guid"] = None
-
-        assert splits.sum()["value_num"] == 0
-
-        print("***TRANSACTIONS***")
-        print(transactions)
-        print("***SPLITS***")
-        print(splits)
-        slots = self.get_associated_uris(transactions)
-        print("***SLOTS***")
-        print(slots)
-
-        if write_to_db:
-            # Warning: be sure about this!
-            transactions.to_sql(
-                "transactions", con=self.engine, if_exists="append", index=False
+            transactions.drop(columns=["Net Units", "cash"], inplace=True)
+            splits_buy.reset_index(inplace=True, drop=True)
+            splits_buy.rename(columns={"guid": "tx_guid"}, inplace=True)
+            splits_buy["guid"] = ""
+            splits_buy["guid"] = splits_buy["guid"].apply(lambda v: uuid4().hex)
+            splits_buy["account_guid"] = splits_buy["to_guid"]
+            splits_buy["memo"] = "imported from CSV"
+            splits_buy["action"] = "Buy"
+            splits_buy["reconcile_state"] = "n"
+            splits_buy["reconcile_date"] = None
+            splits_buy["value_num"] = round(
+                (splits_buy["Net Units"] * splits_buy["cash"] * 100), 2
+            ).astype(int)
+            splits_buy["value_denom"] = 100
+            splits_buy["quantity_num"] = (splits_buy["Net Units"] * 100).astype(int)
+            splits_buy["quantity_denom"] = 100
+            splits_buy["lot_guid"] = None
+            splits_buy = splits_buy.drop(
+                columns=[
+                    "Net Units",
+                    "cash",
+                ]
             )
-            splits.to_sql("splits", con=self.engine, if_exists="append", index=False)
-            slots.to_sql("slots", con=self.engine, if_exists="append", index=False)
-            print("Updated Database!")
-        else:
-            pass
+
+            splits_sell = splits_buy.copy(deep=True)
+            splits_sell["action"] = "Sell"
+            splits_sell["account_guid"] = splits_sell["from_guid"]
+            splits_sell["quantity_num"] = splits_sell["quantity_num"] * -1
+            splits_sell["value_num"] = splits_sell["value_num"] * -1
+            splits_sell["guid"] = splits_sell["guid"].apply(lambda v: uuid4().hex)
+
+            # done with to/from columns, drop 'em
+            splits_buy = splits_buy.drop(
+                columns=[
+                    "to_guid",
+                    "from_guid",
+                ]
+            )
+            splits_sell = splits_sell.drop(
+                columns=[
+                    "to_guid",
+                    "from_guid",
+                ]
+            )
+
+            splits = pd.concat([splits_buy, splits_sell])
+            splits.reset_index(inplace=True, drop=True)
+            splits["reconcile_date"] = "1970-01-01 00:00:00"
+            splits["lot_guid"] = None
+
+            assert splits.sum()["value_num"] == 0
+
+            print("***TRANSACTIONS***")
+            print(transactions)
+            print("***SPLITS***")
+            print(splits)
+            slots = self.get_associated_uris(transactions)
+            print("***SLOTS***")
+            print(slots)
+
+            if write_to_db:
+                # Warning: be sure about this!
+                transactions.to_sql(
+                    "transactions", con=self.engine, if_exists="append", index=False
+                )
+                splits.to_sql(
+                    "splits", con=self.engine, if_exists="append", index=False
+                )
+                slots.to_sql("slots", con=self.engine, if_exists="append", index=False)
+                print("Updated Database!")
+            else:
+                pass
+        except ValueError as e:
+            print("Empty or invalid DataFrame, cannot process")
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
@@ -1263,7 +1277,7 @@ class GnuCash_Data_Analysis:
 
 
 # year = 2022
-gda = GnuCash_Data_Analysis()
+# gda = GnuCash_Data_Analysis()
 
 # gda.sanity_checker()
 
@@ -1271,7 +1285,6 @@ gda = GnuCash_Data_Analysis()
 # print(gda.get_split_accounts("Harvested"))
 # print(gda.get_split_accounts("Delivered"))
 
-print(gda.create_db_records_from_load_file())
 # acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
 # cash_accounts = gda.fetch_transactions(acct_types)
 # print(cash_accounts)
