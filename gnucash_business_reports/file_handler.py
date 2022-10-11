@@ -24,7 +24,9 @@ class MyHandler(FileSystemEventHandler):
         ):
             if downloaded_file.suffix == ".CSV":
                 time.sleep(5)  # give the file time to write
-                self.gda.create_db_records_from_load_file(downloaded_file)
+                self.gda.create_db_records_from_load_file(
+                    downloaded_file, write_to_db=True
+                )
 
     def on_created(self, event):
         print(event.event_type + " -- " + event.src_path)

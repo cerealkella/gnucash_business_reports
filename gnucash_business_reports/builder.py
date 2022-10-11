@@ -1143,7 +1143,9 @@ class GnuCash_Data_Analysis:
             splits_buy = transactions[
                 ["guid", "Net Units", "cash", "to_guid", "from_guid"]
             ]
-            transactions.drop(columns=["Net Units", "cash"], inplace=True)
+            transactions.drop(
+                columns=["Net Units", "cash", "to_guid", "from_guid"], inplace=True
+            )
             splits_buy.reset_index(inplace=True, drop=True)
             splits_buy.rename(columns={"guid": "tx_guid"}, inplace=True)
             splits_buy["guid"] = ""
@@ -1205,14 +1207,20 @@ class GnuCash_Data_Analysis:
 
             if write_to_db:
                 # Warning: be sure about this!
-                transactions.to_sql(
-                    "transactions", con=self.engine, if_exists="append", index=False
-                )
-                splits.to_sql(
-                    "splits", con=self.engine, if_exists="append", index=False
-                )
-                slots.to_sql("slots", con=self.engine, if_exists="append", index=False)
-                print("Updated Database!")
+                tx_len = len(transactions)
+                if tx_len > 0 and len(splits) == tx_len * 2:
+                    transactions.to_sql(
+                        "transactions", con=self.engine, if_exists="append", index=False
+                    )
+                    splits.to_sql(
+                        "splits", con=self.engine, if_exists="append", index=False
+                    )
+                    slots.to_sql(
+                        "slots", con=self.engine, if_exists="append", index=False
+                    )
+                    print("Updated Database!")
+                else:
+                    print("No new records to process, db not updated!")
             else:
                 pass
         except ValueError as e:
