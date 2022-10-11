@@ -3,6 +3,7 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from .config import get_config
+from .builder import GnuCash_Data_Analysis
 
 
 class MyHandler(FileSystemEventHandler):
@@ -13,6 +14,7 @@ class MyHandler(FileSystemEventHandler):
             self.pattern_match = config["file_match_pattern"]
         else:
             self.pattern_match = None
+        self.gda = GnuCash_Data_Analysis()
 
     def _event_handler(self, path):
         downloaded_file = Path(path)
@@ -21,7 +23,8 @@ class MyHandler(FileSystemEventHandler):
             or self.pattern_match == None
         ):
             if downloaded_file.suffix == ".CSV":
-                print("we got us a match")
+                time.sleep(5)  # give the file time to write
+                self.gda.create_db_records_from_load_file(downloaded_file)
 
     def on_created(self, event):
         print(event.event_type + " -- " + event.src_path)
@@ -41,3 +44,6 @@ def watcher(path=Path.joinpath(Path.home(), "Downloads")):
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
+
+
+watcher()
