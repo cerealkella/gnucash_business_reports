@@ -1,4 +1,7 @@
 import logging
+from datetime import datetime
+
+from .config import get_logdir
 
 
 def get_logger() -> logging.Logger:
@@ -20,7 +23,8 @@ def get_logger() -> logging.Logger:
     logger.addHandler(console_handler)
 
     # the second handler is a file handler
-    file_handler = logging.FileHandler(f"{__package__}.log")
+    filename = get_logdir() / datetime.today().strftime("%Y-%m-%d")
+    file_handler = logging.FileHandler(filename)
     file_handler.setLevel(logging.INFO)
     file_handler_format = "%(asctime)s | %(levelname)s | %(lineno)d: %(message)s"
     file_handler.setFormatter(logging.Formatter(file_handler_format))

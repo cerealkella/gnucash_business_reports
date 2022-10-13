@@ -13,6 +13,16 @@ def get_datadir() -> Path:
     return datadir
 
 
+def get_logdir() -> Path:
+    """Find logdir, create it if it doesn't exist"""
+    logdir = Path(AppDirs(__package__).user_log_dir)
+    try:
+        logdir.mkdir(parents=True)
+    except FileExistsError:
+        pass
+    return logdir
+
+
 def get_config() -> dict:
     with open(get_datadir().joinpath("config.toml"), "rb") as f:
         return tomli.load(f)
