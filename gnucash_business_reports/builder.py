@@ -2,7 +2,6 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-import logging
 import pandas as pd
 import pd_db_wrangler
 from dateutil.relativedelta import relativedelta
@@ -12,13 +11,10 @@ from tabulate import tabulate
 
 from .config import get_config, get_datadir, get_gnucash_file_path
 from .helpers import get_keys, nearest, parse_toml
+from .logger import get_logger
 
 
-logging.basicConfig(
-    format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-    level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+log = get_logger()
 
 
 class GnuCash_Data_Analysis:
@@ -123,7 +119,7 @@ class GnuCash_Data_Analysis:
                 df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
                 # Create CSV with Prices which is used for valuation
             self.all_accounts = df
-            logging.info(self.all_accounts)
+            log.info(self.all_accounts)
         return self.all_accounts
 
     def toml_to_df(self, toml_series: pd.Series, str_to_match: str) -> pd.DataFrame:
@@ -187,7 +183,7 @@ class GnuCash_Data_Analysis:
             commodity_mask = prices["fullname"].str.match(commodity.title())
         prices = prices[bids_mask & commodity_mask]
         nearest_bid_date = nearest(prices.index.tolist(), date)
-        logging.info(f"found a nearby date: {nearest_bid_date}")
+        log.info(f"found a nearby date: {nearest_bid_date}")
         return round(
             prices.loc[nearest_bid_date]["value_num"]
             / prices.loc[nearest_bid_date]["value_denom"],
@@ -731,7 +727,7 @@ class GnuCash_Data_Analysis:
 
         all_accounts = self.get_all_accounts().reset_index()
         all_accounts.rename(columns={"guid": "acct_guid"}, inplace=True)
-        logging.info(all_accounts)
+        log.info(all_accounts)
         all_accounts.set_index("acct_guid", drop=True, inplace=True)
 
         # Pull in "Finpack Account" - Which is not Filtered based on Commodity
@@ -1201,16 +1197,16 @@ class GnuCash_Data_Analysis:
 
             assert splits.sum()["value_num"] == 0
 
-            logging.info("***TRANSACTIONS***")
-            logging.info(transactions)
-            logging.info("***SPLITS***")
-            logging.info(splits)
+            log.info("***TRANSACTIONS***")
+            log.info(transactions)
+            log.info("***SPLITS***")
+            log.info(splits)
             slots = self.get_associated_uris(transactions)
-            logging.info("***SLOTS***")
-            logging.info(slots)
+            log.info("***SLOTS***")
+            log.info(slots)
 
             if write_to_db:
-                logging.warning("Attempting to write dataframes to the database!")
+                log.warning("Attempting to write dataframes to the database!")
                 tx_len = len(transactions)
                 if tx_len > 0 and len(splits) == tx_len * 2:
                     transactions.to_sql(
@@ -1222,13 +1218,13 @@ class GnuCash_Data_Analysis:
                     slots.to_sql(
                         "slots", con=self.engine, if_exists="append", index=False
                     )
-                    logging.warning("Updated Database!")
+                    log.warning("Updated Database!")
                 else:
-                    logging.warning("No new records to process, db not updated!")
+                    log.warning("No new records to process, db not updated!")
             else:
                 pass
         except ValueError as e:
-            logging.warning("Empty or invalid DataFrame, cannot process")
+            log.warning("Empty or invalid DataFrame, cannot process")
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
@@ -1259,34 +1255,34 @@ class GnuCash_Data_Analysis:
         net_ar_ap = round(ending_ap_bal + ending_ar_bal, 2)
         net = round(net_cash_flow + last_year_ar_ap_bal + last_year_bal - net_ar_ap, 2)
 
-        logging.warning(
+        log.warning(
             "{} Ending cash balance was:                   {}".format(
                 self.year - 1, last_year_bal
             )
         )
-        logging.warning(
+        log.warning(
             "{} Ending AR/AP balance was:                 {}".format(
                 self.year - 1, last_year_ar_ap_bal
             )
         )
         sanity = net == ending_chk_bal
-        logging.warning(
+        log.warning(
             "{} Finpack net inflows and outflows:  (+){}".format(
                 self.year, net_cash_flow
             )
         )
-        logging.warning(
+        log.warning(
             "{} ending AR/AP balance:              (+){}".format(self.year, net_ar_ap)
         )
-        logging.warning(
+        log.warning(
             "{} Finpack net minus AR/AP balance:   (=){}".format(self.year, net)
         )
-        logging.warning("-----------------------------------------------------")
-        logging.warning(
+        log.warning("-----------------------------------------------------")
+        log.warning(
             "{} Ending balance sheet balance was: {}".format(self.year, ending_chk_bal)
         )
-        logging.warning(" -- We balance, right? ----------------- {}".format(sanity))
-        logging.warning("Difference = {}".format(round(net - ending_chk_bal, 2)))
+        log.warning(" -- We balance, right? ----------------- {}".format(sanity))
+        log.warning("Difference = {}".format(round(net - ending_chk_bal, 2)))
         return sanity
 
 
