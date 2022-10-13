@@ -1286,44 +1286,7 @@ class GnuCash_Data_Analysis:
         return sanity
 
 
-year = 2022
-gda = GnuCash_Data_Analysis()
+# year = 2022
+# gda = GnuCash_Data_Analysis()
 
-gda.sanity_checker()
-
-# print(gda.create_db_records_from_load_file(write_to_db=True))
-# print(gda.get_split_accounts("Harvested"))
-# print(gda.get_split_accounts("Delivered"))
-
-# acct_types = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
-# cash_accounts = gda.fetch_transactions(acct_types)
-# print(cash_accounts)
-# print(gda.get_stock())
-# all_tx = gda.get_all_cash_transactions(year)
-# tx = gda.get_farm_cash_transactions(year)
-# tx_w_depr = pd.concat([tx, depr])
-# tx_w_depr.reset_index(inplace=True)
-# tx_w_depr.sort_values(by=["account_code", "post_date"], inplace=True)
-
-# balance_sheet = gda.get_balance_sheet()
-# balance_sheet = balance_sheet[balance_sheet["post_date"].dt.year <= year]
-# print(balance_sheet)
-# print(balance_sheet.groupby("balance_sheet_category").sum())
-
-# prices = gda.get_commodity_prices()
-# print(prices)
-
-# all_accounts = gda.get_all_accounts()
-# commodities = all_accounts["commodity_guid"].unique()
-# print(commodities.tolist())
-
-
-# price = gda.get_commodity_prices().drop_duplicates().set_index("date", "fullname")
-# dt = datetime(2022, 9, 14)
-
-# soybeans = price[price["fullname"] == "soybeans"]
-# print(nearest(price.index.tolist(), dt))
-# print(gda.get_commodity_bids())
-
-# print(gda.get_commodity_prices().dtypes)
-# print(gda.get_nearest_commodity_bid("SOYBEANS", datetime(2020, 7, 4)))
+# gda.sanity_checker()
