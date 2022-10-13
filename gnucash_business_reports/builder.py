@@ -1,14 +1,24 @@
+from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
+
+import logging
 import pandas as pd
 import pd_db_wrangler
-from pathlib import Path
-from tabulate import tabulate
-from datetime import datetime
-from jinja2 import Environment, FileSystemLoader
 from dateutil.relativedelta import relativedelta
-from uuid import uuid4
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
-from .config import get_datadir, get_gnucash_file_path, get_config
-from .helpers import get_keys, parse_toml, nearest
+from tabulate import tabulate
+
+from .config import get_config, get_datadir, get_gnucash_file_path
+from .helpers import get_keys, nearest, parse_toml
+
+
+logging.basicConfig(
+    format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+    level=logging.DEBUG,
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
 class GnuCash_Data_Analysis:
@@ -113,6 +123,7 @@ class GnuCash_Data_Analysis:
                 df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
                 # Create CSV with Prices which is used for valuation
             self.all_accounts = df
+            logging.info(self.all_accounts)
         return self.all_accounts
 
     def toml_to_df(self, toml_series: pd.Series, str_to_match: str) -> pd.DataFrame:
@@ -170,15 +181,13 @@ class GnuCash_Data_Analysis:
         ).set_index("date")
         bids_mask = prices["type"].str.match("bid")
         guid_list = type(prices["commodity_guid"].drop_duplicates().tolist())
-        print(type(commodity))
-        print(commodity in guid_list)
         if commodity in (prices["commodity_guid"].drop_duplicates().tolist()):
             commodity_mask = prices["commodity_guid"].str.match(commodity)
         else:
             commodity_mask = prices["fullname"].str.match(commodity.title())
         prices = prices[bids_mask & commodity_mask]
         nearest_bid_date = nearest(prices.index.tolist(), date)
-        print(f"found a nearby date: {nearest_bid_date}")
+        logging.info(f"found a nearby date: {nearest_bid_date}")
         return round(
             prices.loc[nearest_bid_date]["value_num"]
             / prices.loc[nearest_bid_date]["value_denom"],
@@ -722,7 +731,7 @@ class GnuCash_Data_Analysis:
 
         all_accounts = self.get_all_accounts().reset_index()
         all_accounts.rename(columns={"guid": "acct_guid"}, inplace=True)
-        print(all_accounts)
+        logging.info(all_accounts)
         all_accounts.set_index("acct_guid", drop=True, inplace=True)
 
         # Pull in "Finpack Account" - Which is not Filtered based on Commodity
@@ -1007,7 +1016,6 @@ class GnuCash_Data_Analysis:
         joplin_notes = pdw_joplin.df_fetch(sql)
         joplin_notes["num"] = joplin_notes["title"].str.replace("Scale Ticket ", "")
         del pdw_joplin
-        print(joplin_notes)
         return joplin_notes.set_index("num").drop(columns="title")
 
     def get_associated_uris(self, tx_df: pd.DataFrame):
@@ -1035,10 +1043,6 @@ class GnuCash_Data_Analysis:
             column="obj_guid",
         )
         slots = build_slots_df()
-        print(slots)
-        # print(df[df["name"] == "assoc_uri"])
-        # df = df[df["name"] == "assoc_uri"].join(tx_df.set_index("guid"))
-        # print(df)
         return slots
         # df_nope = df[~df["num"].isin(df["Ticket Number"])]
         # print(df_nope)
@@ -1197,16 +1201,16 @@ class GnuCash_Data_Analysis:
 
             assert splits.sum()["value_num"] == 0
 
-            print("***TRANSACTIONS***")
-            print(transactions)
-            print("***SPLITS***")
-            print(splits)
+            logging.info("***TRANSACTIONS***")
+            logging.info(transactions)
+            logging.info("***SPLITS***")
+            logging.info(splits)
             slots = self.get_associated_uris(transactions)
-            print("***SLOTS***")
-            print(slots)
+            logging.info("***SLOTS***")
+            logging.info(slots)
 
             if write_to_db:
-                # Warning: be sure about this!
+                logging.warning("Attempting to write dataframes to the database!")
                 tx_len = len(transactions)
                 if tx_len > 0 and len(splits) == tx_len * 2:
                     transactions.to_sql(
@@ -1218,13 +1222,13 @@ class GnuCash_Data_Analysis:
                     slots.to_sql(
                         "slots", con=self.engine, if_exists="append", index=False
                     )
-                    print("Updated Database!")
+                    logging.warning("Updated Database!")
                 else:
-                    print("No new records to process, db not updated!")
+                    logging.warning("No new records to process, db not updated!")
             else:
                 pass
         except ValueError as e:
-            print("Empty or invalid DataFrame, cannot process")
+            logging.warning("Empty or invalid DataFrame, cannot process")
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
@@ -1255,39 +1259,41 @@ class GnuCash_Data_Analysis:
         net_ar_ap = round(ending_ap_bal + ending_ar_bal, 2)
         net = round(net_cash_flow + last_year_ar_ap_bal + last_year_bal - net_ar_ap, 2)
 
-        print(
+        logging.warning(
             "{} Ending cash balance was:                   {}".format(
                 self.year - 1, last_year_bal
             )
         )
-        print(
+        logging.warning(
             "{} Ending AR/AP balance was:                 {}".format(
                 self.year - 1, last_year_ar_ap_bal
             )
         )
         sanity = net == ending_chk_bal
-        print(
+        logging.warning(
             "{} Finpack net inflows and outflows:  (+){}".format(
                 self.year, net_cash_flow
             )
         )
-        print(
+        logging.warning(
             "{} ending AR/AP balance:              (+){}".format(self.year, net_ar_ap)
         )
-        print("{} Finpack net minus AR/AP balance:   (=){}".format(self.year, net))
-        print("-----------------------------------------------------")
-        print(
+        logging.warning(
+            "{} Finpack net minus AR/AP balance:   (=){}".format(self.year, net)
+        )
+        logging.warning("-----------------------------------------------------")
+        logging.warning(
             "{} Ending balance sheet balance was: {}".format(self.year, ending_chk_bal)
         )
-        print(" -- We balance, right? ----------------- {}".format(sanity))
-        print("Difference = {}".format(round(net - ending_chk_bal, 2)))
+        logging.warning(" -- We balance, right? ----------------- {}".format(sanity))
+        logging.warning("Difference = {}".format(round(net - ending_chk_bal, 2)))
         return sanity
 
 
-# year = 2022
-# gda = GnuCash_Data_Analysis()
+year = 2022
+gda = GnuCash_Data_Analysis()
 
-# gda.sanity_checker()
+gda.sanity_checker()
 
 # print(gda.create_db_records_from_load_file(write_to_db=True))
 # print(gda.get_split_accounts("Harvested"))
