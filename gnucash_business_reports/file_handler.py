@@ -1,4 +1,3 @@
-import logging
 import os
 import time
 from pathlib import Path
@@ -8,12 +7,10 @@ from watchdog.observers import Observer
 
 from .builder import GnuCash_Data_Analysis
 from .config import get_config
+from .logger import get_logger
 
-logging.basicConfig(
-    format="%(asctime)s %(levelname)-8s %(message)s",
-    level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+
+log = get_logger()
 
 
 class MyHandler(FileSystemEventHandler):
@@ -32,11 +29,11 @@ class MyHandler(FileSystemEventHandler):
         while True:
             size_now = os.path.getsize(path)
             if size_now == size_past:
-                logging.info(f"File xfer complete. Size={size_now}")
+                log.info(f"File xfer complete. Size={size_now}")
                 return size_now
             else:
                 size_past = os.path.getsize(path)
-                logging.info(f"File transferring...{size_now}")
+                log.info(f"File transferring...{size_now}")
                 time.sleep(1)
         return -1
 
@@ -55,18 +52,18 @@ class MyHandler(FileSystemEventHandler):
                             downloaded_file, write_to_db=True
                         )
             else:
-                logging.warning("invalid or incomplete file")
+                log.warning("invalid or incomplete file")
         except FileNotFoundError as e:
-            logging.warning("temp file deleted, ignoring")
+            log.warning("temp file deleted, ignoring")
 
     def on_created(self, event):
-        logging.info(f"{event.event_type} -- {event.src_path}")
+        log.info(f"{event.event_type} -- {event.src_path}")
         self._event_handler(event.src_path)
 
 
 def watcher(path=Path.joinpath(Path.home(), "Downloads")):
     event_handler = MyHandler()
-    logging.warning(f"Monitoring directory: {path}")
+    log.warning(f"Monitoring directory: {path}")
     observer = Observer()
     observer.schedule(event_handler, path=path, recursive=False)
     observer.start()
