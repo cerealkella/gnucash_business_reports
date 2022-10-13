@@ -6,6 +6,8 @@ def get_logger() -> logging.Logger:
 
     Returns:
         logging.Logger: logger object
+        shout out to Naser Tamimi
+        https://towardsdatascience.com/stop-using-print-and-start-using-logging-a3f50bc8ab0
     """
     logger = logging.getLogger()
     logger.setLevel(logging.NOTSET)
