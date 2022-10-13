@@ -1,13 +1,15 @@
+import time
+
 import keyring
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-import time
+
 from .config import get_config
 
 
 def download_elevator_csv():
     config = get_config()["Elevator"]
-    driver = webdriver.Firefox()  # Or Chrome(), or Ie(), or Opera()
+    driver = webdriver.Chrome()  # Or Firefox(), or Ie(), or Opera()
     driver.get(config["webpage"])
 
     # Find username and password elements
@@ -26,11 +28,11 @@ def download_elevator_csv():
     ).submit()
 
     # Wait for page to load, and click on Loads
-    time.sleep(10)
+    time.sleep(5)
     driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[1]/ul/li[4]/a").click()
 
     # Wait for page to load, and click on CSV button
-    time.sleep(15)
+    time.sleep(5)
     driver.find_element(
         By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div[1]/a"
     ).click()
@@ -38,3 +40,6 @@ def download_elevator_csv():
     # Allow file to download, close browser
     time.sleep(5)
     driver.close()
+
+
+download_elevator_csv()
