@@ -11,10 +11,7 @@ from tabulate import tabulate
 
 from .config import get_config, get_datadir, get_gnucash_file_path
 from .helpers import get_keys, nearest, parse_toml
-from .logger import get_logger
-
-
-log = get_logger()
+from .logger import log
 
 
 class GnuCash_Data_Analysis:

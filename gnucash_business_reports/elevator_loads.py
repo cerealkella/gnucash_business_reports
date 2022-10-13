@@ -5,6 +5,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 from .config import get_config
+from .logger import log
 
 
 def download_elevator_csv():
@@ -20,25 +21,26 @@ def download_elevator_csv():
     username.send_keys(config["username"])
     password.send_keys(keyring.get_password("elevator", config["username"]))
     password.submit()
+    log.info("Logged in!")
 
-    # Wait for page to load, and click on Grain Contracts
     time.sleep(5)
+    log.info("Loading grain contracts!")
     driver.find_element(
         By.XPATH, "/html/body/div/table[1]/tbody/tr/td[3]/form/input[5]"
     ).submit()
 
-    # Wait for page to load, and click on Loads
     time.sleep(5)
+    log.info("Listing Loads!")
     driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[1]/ul/li[4]/a").click()
 
-    # Wait for page to load, and click on CSV button
     time.sleep(5)
+    log.info("Downloading .csv!")
     driver.find_element(
         By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div[1]/a"
     ).click()
 
-    # Allow file to download, close browser
     time.sleep(5)
+    log.info("All done, closing browser!")
     driver.close()
 
 

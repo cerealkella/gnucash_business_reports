@@ -26,3 +26,6 @@ def get_logger() -> logging.Logger:
     file_handler.setFormatter(logging.Formatter(file_handler_format))
     logger.addHandler(file_handler)
     return logger
+
+
+log = get_logger()

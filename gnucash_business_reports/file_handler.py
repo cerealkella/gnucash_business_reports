@@ -7,10 +7,7 @@ from watchdog.observers import Observer
 
 from .builder import GnuCash_Data_Analysis
 from .config import get_config
-from .logger import get_logger
-
-
-log = get_logger()
+from .logger import log
 
 
 class MyHandler(FileSystemEventHandler):
