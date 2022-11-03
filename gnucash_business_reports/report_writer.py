@@ -4,7 +4,7 @@ from jinja2 import Environment, FileSystemLoader
 from datetime import datetime
 
 gda = GnuCash_Data_Analysis()
-gda.year = 2021
+gda.year = 2022
 tx = gda.get_farm_cash_transactions(include_depreciation=True)
 
 
@@ -38,7 +38,7 @@ for code in account_codes:
     total_row[1] = datetime(gda.year, 12, 31)
     latex_df.loc[len(latex_df)] = total_row
     latex_df["post_date"] = latex_df["post_date"].astype("datetime64[ns]")
-    latex_df.rename(
+    latex_df = latex_df.rename(
         columns={
             "src_code": "Src",
             "post_date": "Date",
@@ -46,8 +46,7 @@ for code in account_codes:
             "memo": "Memo",
             "amt": "Amount",
         },
-        inplace=True,
-    )
+    ).sort_values(by=["Date", "Src"])
     # latex_df.style.format()
     latex_str = column_type_changer(
         latex_df.style.hide(axis="index")
