@@ -242,6 +242,29 @@ class GnuCash_Data_Analysis:
         def build_depreciation_schedule(
             account, amount, sec_179, method, term, date_in_service
         ):
+            def get_deduction_month_frequency(method):
+                if method in ("MO S/L", "HY 200DB"):
+                    return 6
+                else:
+                    return 12
+
+            def get_amount_per_term(method: str):
+                if method == "MO S/L":
+                    depreciation = basis / (term * 2)
+                elif method == "HY 200DB":
+                    if loop_counter == (term):
+                        depreciation = amount_left
+                    elif loop_counter == 1:
+                        depreciation_rate = ((basis / (term * 2)) / basis) * 2
+                        depreciation = depreciation_rate * amount_left
+                    else:
+                        depreciation_rate = ((basis / (term)) / basis) * 2
+                        depreciation = depreciation_rate * amount_left
+                    # log.info(f"Depreciation= {depreciation}")
+                else:
+                    depreciation = round(basis / term, 2)
+                return depreciation
+
             basis = amount - sec_179
             depreciation_codes = []
             accounts = []
@@ -249,16 +272,9 @@ class GnuCash_Data_Analysis:
             amounts = []
             descriptions = []
             date_in_service = datetime(date_in_service.year, 12, 31)
-            if method == "MO S/L":
-                deduction_month_frequency = 6
-                amount_per_term = basis / (term * 2)
-            elif method == "HY DOB":
-                deduction_month_frequency = 6
-                amount_per_term = basis / (term * 2)
-            else:
-                deduction_month_frequency = 12
-                amount_per_term = round(basis / term, 2)
             amount_left = basis
+            deduction_month_frequency = get_deduction_month_frequency(method)
+            loop_counter = 0
             if sec_179 > 0:
                 depreciation_codes.append("801")
                 accounts.append(account)
@@ -266,6 +282,7 @@ class GnuCash_Data_Analysis:
                 amounts.append(sec_179 * -1)
                 descriptions.append("Section 179")
             while amount_left > 0.5:
+                loop_counter += 1
                 if amount_left == basis:
                     dates.append(date_in_service)
                     new_date = date_in_service
@@ -277,6 +294,7 @@ class GnuCash_Data_Analysis:
                 depreciation_codes.append("800")
                 accounts.append(account)
                 descriptions.append(f"Regular Depreciation")
+                amount_per_term = get_amount_per_term(method)
                 amounts.append(amount_per_term * -1)
                 amount_left -= amount_per_term
             depreciation_dict = {
