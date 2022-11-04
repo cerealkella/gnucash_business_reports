@@ -704,6 +704,23 @@ class GnuCash_Data_Analysis:
         balance_sheet.loc["Total"] = balance_sheet.sum(numeric_only=True).to_list()
         return balance_sheet.drop(columns=["qty"])
 
+    def get_summary_by_account(self):
+        return (
+            self.get_farm_cash_transactions()
+            .sort_values("account_code")
+            .groupby(["account_code", "account_name"])
+            .sum()
+            .reset_index()
+            .rename(
+                columns={
+                    "account_code": "Code",
+                    "account_name": "Account",
+                    "amt": "Amount",
+                    "quantity": "Quantity",
+                }
+            )
+        )
+
     def get_executive_summary(self):
 
         df = (
