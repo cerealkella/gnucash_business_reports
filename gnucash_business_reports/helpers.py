@@ -67,6 +67,8 @@ caption = {{ {caption} }}
  	}}
 """
     lines[0] = new_firstline
+    # trim off the trailing \\s on last row
+    lines[len(lines) - 2] = lines[len(lines) - 2][:-2]
     lines[len(lines) - 1] = "\end{longtblr}"
 
     return "\n".join(lines).replace("NaN", "")
