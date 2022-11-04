@@ -49,17 +49,7 @@ for code in account_codes:
     ).sort_values(by=["Date", "Src"])
     # latex_df.style.format()
     latex_str = column_type_changer(
-        latex_df.style.hide(axis="index")
-        .format(
-            {"Date": lambda t: t.strftime("%Y-%m-%d")},
-            decimal=".",
-            thousands=",",
-            precision=2,
-            escape="latex",
-        )
-        .to_latex(
-            hrules=False,
-        ),
+        latex_df,
         caption=account_names_dict[code],
     )
     latex.append(latex_str)
@@ -85,8 +75,17 @@ report_details = {
     "organization_name": "Keller Family Farms",
 }
 template = env.get_template("tabularray.tex")
+
+exec_summary = column_type_changer(
+    gda.get_executive_summary(),
+    caption="Executive Summary",
+)
+
 output = template.render(
-    data=report_details, data1=latex_dict, names=account_names_dict
+    exec_summary=exec_summary,
+    data=report_details,
+    data1=latex_dict,
+    names=account_names_dict,
 )
 with open(f"export/{gda.year}-rendered.tex", "w") as f:
     f.write(output)

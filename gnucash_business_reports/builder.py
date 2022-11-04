@@ -400,9 +400,9 @@ class GnuCash_Data_Analysis:
             depreciation_df["post_date"] = depreciation_df["post_date"].astype(
                 "datetime64[ns]"
             )
-            return depreciation_df.reset_index(
-                drop=True
-            )  # .set_index(["tx_guid", "account_guid"])
+            return depreciation_df.reset_index(drop=True).sort_values(
+                by=["account_code", "post_date"]
+            )
 
         return build_dataframe(get_depreciation_accounts())
 
@@ -726,7 +726,13 @@ class GnuCash_Data_Analysis:
             df.loc["OIBDA", "amt"] + df.loc["DEPRECIATION", "amt"]
         )
 
-        return df.sort_values("order")[:5].reset_index().reindex().drop(columns="order")
+        return (
+            df.sort_values("order")[:5]
+            .reset_index()
+            .reindex()
+            .drop(columns="order")
+            .rename(columns={"account_type": "Account", "amt": "Amount"})
+        )
 
     def get_1099_vendor_report(self):
         """Pulls 1099 Vendors from database and drops the data in an
