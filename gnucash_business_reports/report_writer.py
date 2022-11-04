@@ -84,8 +84,14 @@ exec_summary = column_type_changer(
     caption="Executive Summary",
 )
 
+acct_summary = column_type_changer(
+    gda.get_summary_by_account(),
+    caption="Account Totals",
+)
+
 output = template.render(
     exec_summary=exec_summary,
+    acct_summary=acct_summary,
     data=report_details,
     data1=latex_dict,
     names=account_names_dict,
