@@ -1,7 +1,10 @@
-from .builder import GnuCash_Data_Analysis
-from .helpers import column_filler, column_type_changer
-from jinja2 import Environment, FileSystemLoader
 from datetime import datetime
+
+from jinja2 import Environment, FileSystemLoader
+
+from .builder import GnuCash_Data_Analysis
+from .config import get_config
+from .helpers import column_filler, column_type_changer
 
 gda = GnuCash_Data_Analysis()
 gda.year = 2022
@@ -72,7 +75,7 @@ env = Environment(
 )
 report_details = {
     "report_name": f"{gda.year} Transaction Detail Report",
-    "organization_name": "Keller Family Farms",
+    "organization_name": f"""{get_config()["Organization"]["business_name"]}""",
 }
 template = env.get_template("tabularray.tex")
 
