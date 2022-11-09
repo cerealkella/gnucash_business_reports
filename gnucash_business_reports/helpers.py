@@ -61,9 +61,9 @@ theme = fancy,
 caption = {{ {caption} }}
  	]{{
  		colspec = {{ {colspec} }}, width = {width}\linewidth,
- 		rowhead = 2, rowfoot = 1,
- 		row{{odd}} = {{gray9}}, row{{even}} = {{blue9}},
- 		row{{1}} = {{green8}}, row{{Z}} = {{blue7}},
+ 		rowhead = 1, rowfoot = 1,
+ 		row{{odd}} = {{odd-row}}, row{{even}} = {{even-row}},
+ 		row{{1}} = {{header-row}}, row{{Z}} = {{footer-row}},
  	}}
 """
     lines[0] = new_firstline
