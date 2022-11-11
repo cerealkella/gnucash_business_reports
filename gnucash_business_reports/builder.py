@@ -243,7 +243,7 @@ class GnuCash_Data_Analysis:
             account, amount, sec_179, method, term, date_in_service
         ):
             def get_deduction_month_frequency(method):
-                if method in ("MO S/L", "HY 200DB"):
+                if method in ("MO S/L",):  # "HY 200DB"):
                     return 6
                 else:
                     return 12
@@ -706,10 +706,10 @@ class GnuCash_Data_Analysis:
 
     def get_summary_by_account(self):
         return (
-            self.get_farm_cash_transactions()
+            self.get_farm_cash_transactions(include_depreciation=True)
             .sort_values("account_code")
             .groupby(["account_code", "account_name"])
-            .sum()
+            .sum(["quantity", "amt"])
             .reset_index()
             .rename(
                 columns={
@@ -718,7 +718,7 @@ class GnuCash_Data_Analysis:
                     "amt": "Amount",
                     "quantity": "Quantity",
                 }
-            )
+            )[["Code", "Account", "Quantity", "Amount"]]
         )
 
     def get_executive_summary(self):
