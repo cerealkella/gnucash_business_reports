@@ -32,6 +32,8 @@ username = "my_username"
 # specified in the file_match_pattern setting specified
 file_match_pattern = "XYDL"
 
+["Joplin"]
 # used for storing images of receipts
 joplin_db = "/home/user/.config/joplin-desktop/database.sqlite"
 joplin_uri_prefix = "joplin://x-callback-url/openNote?id="
+joplin_api_token = "biglongstring0fl3ttersandNumb3rs"

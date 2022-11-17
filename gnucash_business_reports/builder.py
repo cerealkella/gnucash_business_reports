@@ -1039,8 +1039,9 @@ class GnuCash_Data_Analysis:
         # return [x for x in existing_records.index.to_list()]
 
     def get_joplin_notes(self, ticket_nums: list):
+        self.joplin = get_config()["Joplin"]
         pdw_joplin = pd_db_wrangler.Pandas_DB_Wrangler()
-        pdw_joplin.set_connection_string(self.elevator["joplin_db"], db_type="sqlite")
+        pdw_joplin.set_connection_string(self.joplin["joplin_db"], db_type="sqlite")
         sql = f"""SELECT id as joplin_id, title FROM notes WHERE title IN {["Scale Ticket " + str(x) for x in ticket_nums]}""".replace(
             "[",
             "(",
@@ -1062,9 +1063,7 @@ class GnuCash_Data_Analysis:
             slots["name"] = "assoc_uri"
             slots["slot_type"] = 4
             slots["int64_val"] = 0
-            slots["string_val"] = (
-                self.elevator["joplin_uri_prefix"] + slots["joplin_id"]
-            )
+            slots["string_val"] = self.joplin["joplin_uri_prefix"] + slots["joplin_id"]
             slots.drop(columns="joplin_id", inplace=True)
             slots["timespec_val"] = "1970-01-01 00:00:00"
             slots["numeric_val_num"] = 0
