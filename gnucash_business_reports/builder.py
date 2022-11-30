@@ -813,6 +813,30 @@ class GnuCash_Data_Analysis:
 
         writer.close()
 
+    def get_personal_business_expenses(self):
+        pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler()
+        pdw_personal.set_connection_string(
+            get_gnucash_file_path(books="personal"), db_type="sqlite"
+        )
+        sql = pdw_personal.read_sql_file("sql/personal_business_expenses.sql")
+        business_expenses = pdw_personal.df_fetch(
+            sql.format(self.year), parse_dates=["post_date"]
+        )
+
+        # Filter to transactions from a given year
+        year_mask = business_expenses["post_date"].dt.year == self.year
+        # Apply the filter to the dataframe
+        business_expenses.dropna(inplace=True)
+        business_expenses = business_expenses[year_mask]
+        # Drop the time, not needed
+        business_expenses["post_date"] = business_expenses["post_date"].dt.date
+        business_expenses["Deduct_Total"] = round(
+            business_expenses["Amt"] * (business_expenses["Deduct_Percentage"] * 0.01),
+            2,
+        )
+        business_expenses.to_csv(f"export/{self.year}-personal-farm-expenses.csv")
+        return business_expenses.groupby("Acct")["Amt", "Deduct_Total"].sum()
+
     def get_1099_personal_vendors(self):
         pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler()
         pdw_personal.set_connection_string(
