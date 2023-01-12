@@ -29,49 +29,28 @@ writer.close()
 
 # Get Grain Invoices
 grain_invoices = gda.get_grain_invoices()
-corn = grain_invoices[grain_invoices["Crop"].str.match("Corn")]
-print(corn)
+
+crops = ["Corn", "Soybeans"]
+
 writer = pd.ExcelWriter(f"export/analysis/{gda.year}-Grain.xlsx", engine="xlsxwriter")
-
-# Corn
-corn = grain_invoices[grain_invoices["Crop"].str.match("Corn")]
-corn.to_excel(writer, index=False, sheet_name="Corn")
-workbook = writer.book
-sheet = writer.sheets["Corn"]
-fmt_header = workbook.add_format(
-    {
-        "bold": True,
-        "text_wrap": True,
-        "valign": "top",
-        "fg_color": "#5DADE2",
-        "font_color": "#FFFFFF",
-        "border": 1,
-    }
-)
-for col, value in enumerate(corn.columns.values):
-    sheet.write(0, col, value, fmt_header)
-fmt_currency = workbook.add_format({"num_format": "$#,##0.00", "bold": False})
-sheet.set_column("F:G", 10, fmt_currency)
-
-
-soybeans = grain_invoices[grain_invoices["Crop"].str.match("Soybeans")]
-soybeans.to_excel(writer, index=False, sheet_name="Soybeans")
-
-sheet = writer.sheets["Soybeans"]
-fmt_header = workbook.add_format(
-    {
-        "bold": True,
-        "text_wrap": True,
-        "valign": "top",
-        "fg_color": "#5DADE2",
-        "font_color": "#FFFFFF",
-        "border": 1,
-    }
-)
-for col, value in enumerate(soybeans.columns.values):
-    sheet.write(0, col, value, fmt_header)
-fmt_currency = workbook.add_format({"num_format": "$#,##0.00", "bold": False})
-sheet.set_column("F:G", 10, fmt_currency)
-
+for crop in crops:
+    df = grain_invoices[grain_invoices["Crop"].str.match(crop)]
+    df.to_excel(writer, index=False, sheet_name=crop)
+    workbook = writer.book
+    sheet = writer.sheets[crop]
+    fmt_header = workbook.add_format(
+        {
+            "bold": True,
+            "text_wrap": True,
+            "valign": "top",
+            "fg_color": "#5DADE2",
+            "font_color": "#FFFFFF",
+            "border": 1,
+        }
+    )
+    for col, value in enumerate(df.columns.values):
+        sheet.write(0, col, value, fmt_header)
+    fmt_currency = workbook.add_format({"num_format": "$#,##0.00", "bold": False})
+    sheet.set_column("F:G", 10, fmt_currency)
 
 writer.close()
