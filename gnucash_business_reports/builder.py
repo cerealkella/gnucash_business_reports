@@ -957,7 +957,7 @@ class GnuCash_Data_Analysis:
             .round(2)
         )
 
-    def get_production(self) -> pd.DataFrame:
+    def get_production(self, include_operation_id=True) -> pd.DataFrame:
         """pulls production per field
 
         Returns:
@@ -973,16 +973,19 @@ class GnuCash_Data_Analysis:
 
         harvest = df["account_code"].isin(["301c", "303b"])
 
+        groupby_columns = ["crop", "operation", "operation_id"]
+        if not include_operation_id:
+            groupby_columns.remove("operation_id")
         df = (
             df[harvest]
-            .groupby(["crop", "operation", "operation_id"])[
+            .groupby(groupby_columns)[
                 "quantity",
             ]
             .sum(numeric_only=True)
             .round(2)
             .rename(index=str, columns={"quantity": "total_bushels"})
             .join(
-                self.get_planted_acres(include_operation_id=True),
+                self.get_planted_acres(include_operation_id=include_operation_id),
                 rsuffix="_planted",
             )
         )
@@ -1286,6 +1289,49 @@ class GnuCash_Data_Analysis:
                 pass
         except ValueError as e:
             log.warning("Empty or invalid DataFrame, cannot process")
+
+    def get_grain_invoices(self):
+        """_summary_"""
+        invoice_query = self.pdw.read_sql_file("sql/invoices_master.sql")
+
+        # fetch invoices
+        all_inv = self.pdw.df_fetch(invoice_query)
+        # format date
+        all_inv["date_posted"] = pd.to_datetime(
+            all_inv["date_posted"], utc=True, yearfirst=True
+        ).dt.tz_localize(None)
+        # drop unnecessary columns
+        all_inv["amount"] = all_inv["amt"] - all_inv["disc_amt"]
+        all_inv.drop(
+            columns=[
+                "paytype",
+                "disc_how",
+                "disc_amt",
+                "taxable",
+                "taxincluded",
+                "price",
+                "amt",
+            ],
+            inplace=True,
+        )
+        year_mask = all_inv["date_posted"].dt.year == self.year
+        code_mask = all_inv["account_code"].str.match("133|134")
+        inv_mask = all_inv["inv_type"] == "INVOICE"
+        invoices = all_inv[year_mask & inv_mask & code_mask]
+        grain = invoices.groupby(
+            ["date_posted", "inv_id", "account_name", "org_name"]
+        ).sum(numeric_only=True)
+        grain["Price"] = grain["amount"] / grain["quantity"]
+        return grain.reset_index().rename(
+            columns={
+                "date_posted": "Date",
+                "inv_id": "Invoice",
+                "account_name": "Crop",
+                "org_name": "Elevator",
+                "quantity": "Bushels",
+                "amount": "Amount",
+            }
+        )
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
