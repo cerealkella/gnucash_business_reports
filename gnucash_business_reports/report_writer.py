@@ -12,7 +12,7 @@ def build_report(gda):
 
     account_codes = tx["account_code"].unique()
     tx["display"] = tx["account_name"] + " (" + tx["account_code"] + ")"
-    account_totals = tx.groupby(["account_code"]).sum()
+    account_totals = tx.groupby(["account_code"]).sum(numeric_only=True)
     account_names_df = tx.reset_index()
     account_names_df.set_index(["account_code"], inplace=True)
     account_names_df = account_names_df["display"]
