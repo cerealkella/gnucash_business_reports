@@ -704,9 +704,9 @@ class GnuCash_Data_Analysis:
         balance_sheet.loc["Total"] = balance_sheet.sum(numeric_only=True).to_list()
         return balance_sheet.drop(columns=["qty"])
 
-    def get_summary_by_account(self):
+    def get_summary_by_account(self, include_depreciation=True):
         return (
-            self.get_farm_cash_transactions(include_depreciation=True)
+            self.get_farm_cash_transactions(include_depreciation=include_depreciation)
             .sort_values("account_code")
             .groupby(["account_code", "account_name"])
             .sum(["quantity", "amt"])
@@ -721,28 +721,26 @@ class GnuCash_Data_Analysis:
             )[["Code", "Account", "Quantity", "Amount"]]
         )
 
-    def get_executive_summary(self):
-
+    def get_executive_summary(self, include_depreciation=True):
         df = (
-            self.get_farm_cash_transactions(include_depreciation=True)
+            self.get_farm_cash_transactions(include_depreciation=include_depreciation)
             .reset_index(drop=True)
             .sort_values(by=["account_code", "post_date"])
             .groupby("account_type")
             .sum(numeric_only=True)
             .drop(columns="quantity")
         )
-
         df["order"] = 100
         df.loc["INCOME", "order"] = 10
         df.loc["EXPENSE", "order"] = 20
         df.loc["OIBDA", "order"] = 30
         df.loc["OIBDA", "amt"] = df.loc["INCOME", "amt"] + df.loc["EXPENSE", "amt"]
-        df.loc["DEPRECIATION", "order"] = 40
-        df.loc["NET INCOME", "order"] = 50
-        df.loc["NET INCOME", "amt"] = (
-            df.loc["OIBDA", "amt"] + df.loc["DEPRECIATION", "amt"]
-        )
-
+        if include_depreciation:
+            df.loc["DEPRECIATION", "order"] = 40
+            df.loc["NET INCOME", "order"] = 50
+            df.loc["NET INCOME", "amt"] = (
+                df.loc["OIBDA", "amt"] + df.loc["DEPRECIATION", "amt"]
+            )
         return (
             df.sort_values("order")[:5]
             .reset_index()
