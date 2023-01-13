@@ -9,7 +9,6 @@ from .helpers import column_filler, column_type_changer
 
 def build_report(gda):
     tx = gda.get_farm_cash_transactions(include_depreciation=False)
-
     account_codes = tx["account_code"].unique()
     tx["display"] = tx["account_name"] + " (" + tx["account_code"] + ")"
     account_totals = tx.groupby(["account_code"]).sum(numeric_only=True)
@@ -81,12 +80,12 @@ def build_report(gda):
     template = env.get_template("tabularray.tex")
 
     exec_summary = column_type_changer(
-        gda.get_executive_summary(),
+        gda.get_executive_summary(include_depreciation=False),
         caption="Executive Summary",
     )
 
     acct_summary = column_type_changer(
-        gda.get_summary_by_account(),
+        gda.get_summary_by_account(include_depreciation=False),
         caption="Account Totals",
     )
 
@@ -162,3 +161,4 @@ gda.year = 2022
 build_report(gda)
 production_data(gda)
 grain_invoices(gda)
+gda.sanity_checker()
