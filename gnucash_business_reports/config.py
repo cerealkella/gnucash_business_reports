@@ -42,3 +42,8 @@ def get_gnucash_file_path(books: str = "business") -> Path:
         Path: Path to business or personal data file
     """
     return get_config()["GNUCash"][f"{books}_path"]
+
+
+def get_excel_formatting():
+    with open("templates/excel_styling.toml", "rb") as f:
+        return tomli.load(f)

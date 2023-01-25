@@ -162,3 +162,9 @@ build_report(gda)
 production_data(gda)
 grain_invoices(gda)
 gda.sanity_checker()
+
+# reports to run for tax purposes
+gda.get_1099_personal_vendors()
+gda.get_1099_vendor_report()
+gda.generate_wage_reports()
+gda.get_personal_business_expenses()

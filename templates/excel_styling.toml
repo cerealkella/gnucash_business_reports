@@ -1,0 +1,12 @@
+# Excel Formatting
+[header]
+bold = true
+text_wrap = true
+valign = "top"
+fg_color = "#5DADE2"
+font_color = "#FFFFFF"
+border = 1
+
+[currency]
+num_format = "$#,##0.00"
+bold = false

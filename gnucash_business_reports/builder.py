@@ -9,7 +9,7 @@ from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
 from tabulate import tabulate
 
-from .config import get_config, get_datadir, get_gnucash_file_path
+from .config import get_config, get_datadir, get_gnucash_file_path, get_excel_formatting
 from .helpers import get_keys, nearest, parse_toml
 from .logger import log
 
@@ -22,6 +22,7 @@ class GnuCash_Data_Analysis:
         self.year = datetime.now().year  # defaults to current year
         self.all_accounts = None
         self.cash_accounts = ["RECEIVABLE", "PAYABLE", "BANK", "CREDIT", "CASH"]
+        self.excel_formatting = get_excel_formatting()
         # Suppress warnings, format numbers
         pd.options.mode.chained_assignment = None  # default='warn'
         pd.set_option("display.float_format", lambda x: "%.2f" % x)
@@ -867,16 +868,7 @@ class GnuCash_Data_Analysis:
         totals_sheet = writer.sheets["Totals"]
         # Adding currency format
         fmt_currency = workbook.add_format({"num_format": "$#,##0.00", "bold": False})
-        fmt_header = workbook.add_format(
-            {
-                "bold": True,
-                "text_wrap": True,
-                "valign": "top",
-                "fg_color": "#5DADE2",
-                "font_color": "#FFFFFF",
-                "border": 1,
-            }
-        )
+        fmt_header = workbook.add_format(self.excel_formatting["header"])
 
         for col, value in enumerate(grouped_personal_vendors.columns.values):
             totals_sheet.write(0, col, value, fmt_header)
@@ -890,6 +882,69 @@ class GnuCash_Data_Analysis:
 
         details_sheet.set_column("D:D", 10, fmt_currency)
         del pdw_personal
+        writer.close()
+
+    def generate_wage_reports(self):
+        sql = self.pdw.read_sql_file("sql/w-2_employees.sql")
+        df = self.pdw.df_fetch(sql.format(self.year), parse_dates=["post_date"])
+        log.info(df)
+
+        df["month"] = df["post_date"].dt.month
+        # Filter to transactions from a given year
+        year_mask = df["post_date"].dt.year == self.year
+        # Apply the filter to the dataframe
+        df = df[year_mask]
+        # Drop the time, not needed
+        df["post_date"] = df["post_date"].dt.date
+
+        # DETAILS
+        writer = pd.ExcelWriter(f"export/{self.year}-W2_Data.xlsx", engine="xlsxwriter")
+        df.to_excel(writer, index=False, sheet_name="Transactions")
+        workbook = writer.book
+        transactions_sheet = writer.sheets["Transactions"]
+        fmt_header = workbook.add_format(self.excel_formatting["header"])
+        fmt_currency = workbook.add_format(self.excel_formatting["currency"])
+
+        for col, value in enumerate(df.columns.values):
+            transactions_sheet.write(0, col, value, fmt_header)
+        transactions_sheet.set_column("E:E", 10, fmt_currency)
+
+        # WITHHOLDING
+        monthly_withholding = df.groupby(["month", "memo"]).sum(numeric_only=True)
+        monthly_withholding.reset_index(inplace=True)
+        monthly_withholding.to_excel(
+            writer, index=False, sheet_name="Monthly_Withholding"
+        )
+        monthly_sheet = writer.sheets["Monthly_Withholding"]
+        for col, value in enumerate(monthly_withholding.columns.values):
+            monthly_sheet.write(0, col, value, fmt_header)
+        monthly_sheet.set_column("C:C", 10, fmt_currency)
+
+        # WAGE TOTALS
+        w2 = df.groupby(
+            ["code", "emp_id", "emp_name", "emp_addr1", "emp_addr2", "memo"]
+        )["amt"].sum()
+        w2 = w2.reset_index()
+        w2.to_excel(writer, index=False, sheet_name="W2_Wage_Totals")
+        wages_sheet = writer.sheets["W2_Wage_Totals"]
+        for col, value in enumerate(w2.columns.values):
+            wages_sheet.write(0, col, value, fmt_header)
+        wages_sheet.set_column("G:G", 10, fmt_currency)
+
+        # LABOR DEPOSITS
+        labor_sql = self.pdw.read_sql_file("sql/federal_labor_deposits.sql")
+        labor_deposits = self.pdw.df_fetch(labor_sql, parse_dates=["post_date"])
+
+        # Filter to transactions from a given year
+        year_mask = labor_deposits["post_date"].dt.year == self.year
+        labor_deposits = labor_deposits[year_mask]
+        # Drop the time, not needed
+        labor_deposits["post_date"] = labor_deposits["post_date"].dt.date
+        labor_deposits.to_excel(writer, index=False, sheet_name="Labor_Deposits")
+        deposits_sheet = writer.sheets["Labor_Deposits"]
+        for col, value in enumerate(labor_deposits.columns.values):
+            deposits_sheet.write(0, col, value, fmt_header)
+        deposits_sheet.set_column("C:C", 10, fmt_currency)
         writer.close()
 
     def get_rented_acres(self) -> pd.DataFrame:
