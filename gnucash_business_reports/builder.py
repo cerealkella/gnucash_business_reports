@@ -26,10 +26,9 @@ class GnuCash_Data_Analysis:
         # Suppress warnings, format numbers
         pd.options.mode.chained_assignment = None  # default='warn'
         pd.set_option("display.float_format", lambda x: "%.2f" % x)
-        self.pdw = pd_db_wrangler.Pandas_DB_Wrangler()
-        self.pdw.set_connection_string(get_gnucash_file_path(), db_type="sqlite")
+        self.pdw = pd_db_wrangler.Pandas_DB_Wrangler(get_gnucash_file_path())
         # Unix/Mac - 4 initial slashes in total
-        self.engine = create_engine(f"sqlite:////{get_gnucash_file_path()}")
+        self.engine = self.pdw.engine
 
     def filter_by_year(
         self, df: pd.DataFrame, column: str, all_years_plus_specified: bool = False
@@ -1031,9 +1030,7 @@ class GnuCash_Data_Analysis:
             groupby_columns.remove("operation_id")
         df = (
             df[harvest]
-            .groupby(groupby_columns)[
-                "quantity",
-            ]
+            .groupby(groupby_columns)["quantity",]
             .sum(numeric_only=True)
             .round(2)
             .rename(index=str, columns={"quantity": "total_bushels"})
@@ -1399,6 +1396,9 @@ class GnuCash_Data_Analysis:
         year_mask = all_tx["post_date"].dt.year <= self.year
         chk_mask = all_tx["src_type"].str.match("(BANK)|(CREDIT)|(CASH)")
         # chk_mask = all_tx["src_code"].str.match("100")
+        all_tx[chk_mask & year_mask].groupby(["src_code", "src_name"]).sum(
+            numeric_only=True
+        ).to_csv(f"export/{self.year}-cash.csv")
         ar_mask = all_tx["src_type"].str.match("RECEIVABLE")
         ap_mask = all_tx["src_type"].str.match("PAYABLE")
 
