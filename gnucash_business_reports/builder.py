@@ -26,6 +26,7 @@ class GnuCash_Data_Analysis:
         # Suppress warnings, format numbers
         pd.options.mode.chained_assignment = None  # default='warn'
         pd.set_option("display.float_format", lambda x: "%.2f" % x)
+        self.date_format = "%Y-%m-%d %H:%M:%S"
         self.pdw = pd_db_wrangler.Pandas_DB_Wrangler(get_gnucash_file_path())
         # Unix/Mac - 4 initial slashes in total
         self.engine = self.pdw.engine
@@ -146,15 +147,14 @@ class GnuCash_Data_Analysis:
         return df
 
     def get_commodity_prices(self) -> pd.DataFrame:
+        dates = {"date": self.date_format}
         if not self.CACHED_MODE:
             prices = self.pdw.df_fetch(
-                self.pdw.read_sql_file("sql/prices.sql"), parse_dates=["date"]
+                self.pdw.read_sql_file("sql/prices.sql"), parse_dates=dates
             )
             prices.to_csv(f"{self.data_directory}/PRICES.csv")
         else:
-            prices = pd.read_csv(
-                f"{self.data_directory}/PRICES.csv", parse_dates=["date"]
-            )
+            prices = pd.read_csv(f"{self.data_directory}/PRICES.csv", parse_dates=dates)
         return self.filter_by_year(prices, "date")
 
     def get_nearest_commodity_bid(self, commodity: str, date: datetime) -> float:
@@ -169,8 +169,9 @@ class GnuCash_Data_Analysis:
         """
         # not using the get_commodity_prices function because we don't want to
         # filter on date by year
+        dates = {"date": self.date_format}
         prices = self.pdw.df_fetch(
-            self.pdw.read_sql_file("sql/prices.sql"), parse_dates=["date"]
+            self.pdw.read_sql_file("sql/prices.sql"), parse_dates=dates
         ).set_index("date")
         bids_mask = prices["type"].str.match("bid")
         guid_list = type(prices["commodity_guid"].drop_duplicates().tolist())
@@ -450,16 +451,26 @@ class GnuCash_Data_Analysis:
             """
             This gives us everything for each acct, not filtered by
             year, allowing us to get current balances for sanity checking
+            2023-04-16 - explicitly attempting to coerce errors for post_date
+            there seems to be som normalization issues in GNUCash so it'd be
+            good to do some database fixing to normalize the precision of the
+            data in SQLite
             """
             sql = self.pdw.read_sql_file("sql/transactions_master.sql")
-
+            dates = {
+                "post_date": {
+                    "format": self.date_format,
+                    "errors": "coerce",
+                    "exact": False,
+                },
+                "enter_date": self.date_format,
+                "reconcile_date": self.date_format,
+            }
             for guid in guids:
                 query = sql.format(
                     inner_where.format(guid), main_where.format(guid), multiplier
                 )
-                tx = self.pdw.df_fetch(
-                    query, parse_dates=["post_date", "enter_date", "reconcile_date"]
-                )
+                tx = self.pdw.df_fetch(query, parse_dates=dates)
                 if guid == guids[0]:
                     all_tx = tx
                 else:
@@ -475,7 +486,7 @@ class GnuCash_Data_Analysis:
                         "src_code": object,
                         "tx_num": object,
                     },
-                    parse_dates=["post_date", "enter_date", "reconcile_date"],
+                    parse_dates=dates,
                 )
                 if account == acct_types[0]:
                     tx = csv_import
@@ -501,7 +512,6 @@ class GnuCash_Data_Analysis:
         )
         tx.set_index(["tx_guid", "account_guid"], inplace=True)
         tx = tx.join(invoices[["quantity"]])
-        tx["post_date"] = pd.to_datetime(tx["post_date"], yearfirst=True)
         return tx.fillna(0)
 
     def get_assets(self) -> pd.DataFrame:
@@ -683,10 +693,15 @@ class GnuCash_Data_Analysis:
 
     def get_invoices(self):
         # bring in invoices for quantities
+        dates = {
+            "date_posted": self.date_format,
+            "date_opened": self.date_format,
+            "entry_date": self.date_format,
+        }
         invoices_sql = self.pdw.read_sql_file("sql/invoices_master.sql")
-        invoices = self.pdw.df_fetch(
-            invoices_sql, parse_dates=["date_posted", "date_opened", "entry_date"]
-        )
+        invoices = self.pdw.df_fetch(invoices_sql, parse_dates=dates)
+        log.info(invoices.dtypes)
+        invoices.to_csv("export/invoices.csv")
         return self.filter_by_year(
             invoices.rename(columns={"post_txn": "tx_guid"}), "date_posted"
         )
@@ -753,8 +768,11 @@ class GnuCash_Data_Analysis:
         """Pulls 1099 Vendors from database and drops the data in an
         Excel file to be shipped off for 1099 creation
         """
+        dates = {
+            "post_date": self.date_format,
+        }
         tax_1099_vendors = self.pdw.read_sql_file("sql/1099_vendors.sql")
-        vendors = self.pdw.df_fetch(tax_1099_vendors, parse_dates=["post_date"])
+        vendors = self.pdw.df_fetch(tax_1099_vendors, parse_dates=dates)
 
         # Filter to transactions from a given year
         vendors = vendors[vendors["post_date"].dt.year == self.year]
@@ -812,13 +830,16 @@ class GnuCash_Data_Analysis:
         writer.close()
 
     def get_personal_business_expenses(self):
+        dates = {
+            "post_date": self.date_format,
+        }
         pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler()
         pdw_personal.set_connection_string(
             get_gnucash_file_path(books="personal"), db_type="sqlite"
         )
         sql = pdw_personal.read_sql_file("sql/personal_business_expenses.sql")
         business_expenses = pdw_personal.df_fetch(
-            sql.format(self.year), parse_dates=["post_date"]
+            sql.format(self.year), parse_dates=dates
         )
 
         # Filter to transactions from a given year
@@ -836,15 +857,15 @@ class GnuCash_Data_Analysis:
         return business_expenses.groupby("Acct")["Amt", "Deduct_Total"].sum()
 
     def get_1099_personal_vendors(self):
-        pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler()
-        pdw_personal.set_connection_string(
-            get_gnucash_file_path(books="personal"), db_type="sqlite"
+        dates = {
+            "post_date": self.date_format,
+        }
+        pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler(
+            get_gnucash_file_path(books="personal")
         )
 
         tax_1099_vendors = pdw_personal.read_sql_file("sql/1099_vendors_personal.sql")
-        personal_vendors = pdw_personal.df_fetch(
-            tax_1099_vendors, parse_dates=["post_date"]
-        )
+        personal_vendors = pdw_personal.df_fetch(tax_1099_vendors, parse_dates=dates)
 
         # Filter to transactions from a given year
         year_mask = personal_vendors["post_date"].dt.year == self.year
@@ -884,8 +905,11 @@ class GnuCash_Data_Analysis:
         writer.close()
 
     def generate_wage_reports(self):
+        dates = {
+            "post_date": self.date_format,
+        }
         sql = self.pdw.read_sql_file("sql/w-2_employees.sql")
-        df = self.pdw.df_fetch(sql.format(self.year), parse_dates=["post_date"])
+        df = self.pdw.df_fetch(sql.format(self.year), parse_dates=dates)
         log.info(df)
 
         df["month"] = df["post_date"].dt.month
@@ -932,7 +956,7 @@ class GnuCash_Data_Analysis:
 
         # LABOR DEPOSITS
         labor_sql = self.pdw.read_sql_file("sql/federal_labor_deposits.sql")
-        labor_deposits = self.pdw.df_fetch(labor_sql, parse_dates=["post_date"])
+        labor_deposits = self.pdw.df_fetch(labor_sql, parse_dates=dates)
 
         # Filter to transactions from a given year
         year_mask = labor_deposits["post_date"].dt.year == self.year
@@ -1342,13 +1366,18 @@ class GnuCash_Data_Analysis:
 
     def get_grain_invoices(self):
         """_summary_"""
+        dates = {
+            "post_date": self.date_format,
+            "enter_date": self.date_format,
+            "reconcile_date": self.date_format,
+        }
         invoice_query = self.pdw.read_sql_file("sql/invoices_master.sql")
 
         # fetch invoices
-        all_inv = self.pdw.df_fetch(invoice_query)
+        all_inv = self.pdw.df_fetch(invoice_query, parse_dates=dates)
         # format date
         all_inv["date_posted"] = pd.to_datetime(
-            all_inv["date_posted"], utc=True, yearfirst=True
+            all_inv["date_posted"], utc=True, yearfirst=True, errors="coerce"
         ).dt.tz_localize(None)
         # drop unnecessary columns
         all_inv["amount"] = all_inv["amt"] - all_inv["disc_amt"]
