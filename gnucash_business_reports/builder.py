@@ -68,7 +68,11 @@ class GnuCash_Data_Analysis:
                     f"{self.data_directory}/ALL_ACCOUNTS.csv", dtype={"code": object}
                 )
             else:
-                df = self.pdw.df_fetch(self.pdw.read_sql_file("sql/all_accounts.sql"))
+                df = self.pdw.df_fetch(
+                    self.pdw.read_sql_file("sql/all_accounts.sql"),
+                    dtype={"code": pd.StringDtype()},
+                )
+                log.info(df.dtypes)
                 df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False)
 
             all_account_types = df["account_type"].unique().tolist()
@@ -700,7 +704,6 @@ class GnuCash_Data_Analysis:
         }
         invoices_sql = self.pdw.read_sql_file("sql/invoices_master.sql")
         invoices = self.pdw.df_fetch(invoices_sql, parse_dates=dates)
-        log.info(invoices.dtypes)
         invoices.to_csv("export/invoices.csv")
         return self.filter_by_year(
             invoices.rename(columns={"post_txn": "tx_guid"}), "date_posted"
