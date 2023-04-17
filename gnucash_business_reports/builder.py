@@ -9,7 +9,13 @@ from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
 from tabulate import tabulate
 
-from .config import get_config, get_datadir, get_gnucash_file_path, get_excel_formatting
+from .config import (
+    get_config,
+    get_datadir,
+    get_gnucash_file_path,
+    get_excel_formatting,
+    get_mapper,
+)
 from .helpers import get_keys, nearest, parse_toml
 from .logger import log
 
@@ -65,12 +71,13 @@ class GnuCash_Data_Analysis:
         if self.all_accounts is None:
             if self.CACHED_MODE:
                 df = pd.read_csv(
-                    f"{self.data_directory}/ALL_ACCOUNTS.csv", dtype={"code": object}
+                    f"{self.data_directory}/ALL_ACCOUNTS.csv",
+                    dtype=get_mapper(),
                 )
             else:
                 df = self.pdw.df_fetch(
                     self.pdw.read_sql_file("sql/all_accounts.sql"),
-                    dtype={"code": pd.StringDtype()},
+                    dtype=get_mapper(),
                 )
                 log.info(df.dtypes)
                 df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False)
@@ -462,6 +469,8 @@ class GnuCash_Data_Analysis:
             """
             sql = self.pdw.read_sql_file("sql/transactions_master.sql")
             dates = {
+                # 2023-04-17 I don't think I need to be this specific
+                # after running the post_date_fixer.sql
                 "post_date": {
                     "format": self.date_format,
                     "errors": "coerce",

@@ -1,0 +1,12 @@
+["all_accounts"]
+name="string"
+account_type="string"
+commodity_guid="string"
+commodity_scu="int64"
+non_std_scu="int64"
+parent_guid ="string"
+code="string"
+description ="string"
+hidden="int64"
+placeholder="int64"
+account_notes ="string"
