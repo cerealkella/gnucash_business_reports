@@ -41,7 +41,7 @@ class MyHandler(FileSystemEventHandler):
                 downloaded_file = Path(path)
                 if (
                     downloaded_file.name[: self.match_len] == self.pattern_match
-                    or self.pattern_match == None
+                    or self.pattern_match is None
                 ):
                     if downloaded_file.suffix.lower() == ".csv":
                         time.sleep(5)  # give the file time to write
@@ -51,6 +51,7 @@ class MyHandler(FileSystemEventHandler):
             else:
                 log.warning("invalid or incomplete file")
         except FileNotFoundError as e:
+            log.warning(e)
             log.warning("temp file deleted, ignoring")
 
     def on_created(self, event):
