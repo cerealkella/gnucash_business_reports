@@ -17,8 +17,7 @@ from .logger import log
 
 
 class GnuCash_Data_Analysis:
-    def __init__(self, cached_mode=False):
-        self.CACHED_MODE = cached_mode
+    def __init__(self):
         self.data_directory = get_datadir()
         # Set Reporting year constant
         self.year = datetime.now().year  # defaults to current year
@@ -58,25 +57,15 @@ class GnuCash_Data_Analysis:
             return df
 
     def get_all_accounts(self) -> pd.DataFrame:
-        """
-        Optionally Override cached mode
-
-        True = use CSV files
-        False = use live data from database
-        """
+        """ Get all accounts from the database """
         if self.all_accounts is None:
-            if self.CACHED_MODE:
-                df = pd.read_csv(
-                    f"{self.data_directory}/ALL_ACCOUNTS.csv",
-                )
-            else:
-                df = self.pdw.df_fetch(
-                    self.pdw.read_sql_file("sql/all_accounts.sql"),
-                )
-                log.info(df.dtypes)
-                df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False)
+            df = self.pdw.df_fetch(
+                self.pdw.read_sql_file("sql/all_accounts.sql"),
+            )
+            log.info(df.dtypes)
+            df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False)
 
-            all_account_types = df["account_type"].unique().tolist()
+            # all_account_types = df["account_type"].unique().tolist()
             id_name_dict = dict(zip(df["guid"], df["name"]))
             parent_dict = dict(zip(df["guid"], df["parent_guid"]))
 
@@ -117,10 +106,8 @@ class GnuCash_Data_Analysis:
             df.loc[df["name"].str.contains("Soybeans"), "crop"] = "Soybeans"
             df.loc[df["name"].str.contains("Corn"), "crop"] = "Corn"
 
-            if not self.CACHED_MODE:
-                # Create CSV with Parental Tree for reporting
-                df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
-                # Create CSV with Prices which is used for valuation
+            # Create CSV with Parental Tree for reporting
+            df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
             self.all_accounts = df
             log.info(self.all_accounts)
         return self.all_accounts
@@ -153,13 +140,11 @@ class GnuCash_Data_Analysis:
 
     def get_commodity_prices(self) -> pd.DataFrame:
         dates = {"date": self.date_format}
-        if not self.CACHED_MODE:
-            prices = self.pdw.df_fetch(
-                self.pdw.read_sql_file("sql/prices.sql"), parse_dates=dates
-            )
-            prices.to_csv(f"{self.data_directory}/PRICES.csv")
-        else:
-            prices = pd.read_csv(f"{self.data_directory}/PRICES.csv", parse_dates=dates)
+        
+        prices = self.pdw.df_fetch(
+            self.pdw.read_sql_file("sql/prices.sql"), parse_dates=dates
+        )
+        prices.to_csv(f"{self.data_directory}/PRICES.csv")
         return self.filter_by_year(prices, "date")
 
     def get_nearest_commodity_bid(self, commodity: str, date: datetime) -> float:
@@ -484,34 +469,18 @@ class GnuCash_Data_Analysis:
                     all_tx = pd.concat([all_tx, tx])
             return all_tx
 
-        if self.CACHED_MODE:
-            for account in acct_types:
-                csv_import = pd.read_csv(
-                    f"{self.data_directory}/{account}.csv",
-                    dtype={
-                        "account_code": object,
-                        "src_code": object,
-                        "tx_num": object,
-                    },
-                    parse_dates=dates,
-                )
-                if account == acct_types[0]:
-                    tx = csv_import
-                else:
-                    tx = pd.concat([tx, csv_import])
-        else:
-            for account in acct_types:
-                guids = self.get_guid_list([account])
-                csv_export = get_transactions_from_db(guids, inverse_multiplier)
-                csv_export.to_csv(f"{self.data_directory}/{account}.csv", index=False)
-                if account == acct_types[0]:
-                    tx = csv_export
-                else:
-                    tx = pd.concat([tx, csv_export])
-            tx = tx.join(
-                self.all_accounts[["finpack_account", "parent_accounts"]],
-                on="account_guid",
-            )
+        for account in acct_types:
+            guids = self.get_guid_list([account])
+            csv_export = get_transactions_from_db(guids, inverse_multiplier)
+            csv_export.to_csv(f"{self.data_directory}/{account}.csv", index=False)
+            if account == acct_types[0]:
+                tx = csv_export
+            else:
+                tx = pd.concat([tx, csv_export])
+        tx = tx.join(
+            self.all_accounts[["finpack_account", "parent_accounts"]],
+            on="account_guid",
+        )
         invoices = (
             self.get_invoices()
             .groupby(["tx_guid", "account_guid"])
@@ -1060,7 +1029,7 @@ class GnuCash_Data_Analysis:
             groupby_columns.remove("operation_id")
         df = (
             df[harvest]
-            .groupby(groupby_columns)["quantity",]
+            .groupby(groupby_columns)["quantity", ]
             .sum(numeric_only=True)
             .round(2)
             .rename(index=str, columns={"quantity": "total_bushels"})
@@ -1149,7 +1118,8 @@ class GnuCash_Data_Analysis:
         self.joplin = get_config()["Joplin"]
         pdw_joplin = pd_db_wrangler.Pandas_DB_Wrangler()
         pdw_joplin.set_connection_string(self.joplin["joplin_db"], db_type="sqlite")
-        sql = f"""SELECT id as joplin_id, title FROM notes WHERE title IN {["Scale Ticket " + str(x) for x in ticket_nums]}""".replace(
+        sql = "SELECT id as joplin_id, title FROM notes"
+        sql += f""" WHERE title IN {["Scale Ticket " + str(x) for x in ticket_nums]}""".replace(
             "[",
             "(",
         ).replace(
