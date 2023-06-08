@@ -5,16 +5,12 @@ from uuid import uuid4
 import pandas as pd
 import pd_db_wrangler
 from dateutil.relativedelta import relativedelta
-from jinja2 import Environment, FileSystemLoader
-from sqlalchemy import create_engine
-from tabulate import tabulate
 
 from .config import (
     get_config,
     get_datadir,
     get_gnucash_file_path,
     get_excel_formatting,
-    get_mapper,
 )
 from .helpers import get_keys, nearest, parse_toml
 from .logger import log
@@ -72,12 +68,10 @@ class GnuCash_Data_Analysis:
             if self.CACHED_MODE:
                 df = pd.read_csv(
                     f"{self.data_directory}/ALL_ACCOUNTS.csv",
-                    dtype=get_mapper(),
                 )
             else:
                 df = self.pdw.df_fetch(
                     self.pdw.read_sql_file("sql/all_accounts.sql"),
-                    dtype=get_mapper(),
                 )
                 log.info(df.dtypes)
                 df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS.csv", index=False)
@@ -145,7 +139,7 @@ class GnuCash_Data_Analysis:
             toml_series.str.contains(f"\[{str_to_match}\]").replace(
                 "\\n", "\n", regex=True
             )
-            == True
+            is True
         ]
         match = match[match.index.drop_duplicates()]  # match.drop_duplicates()
         keys = get_keys(
@@ -185,7 +179,7 @@ class GnuCash_Data_Analysis:
             self.pdw.read_sql_file("sql/prices.sql"), parse_dates=dates
         ).set_index("date")
         bids_mask = prices["type"].str.match("bid")
-        guid_list = type(prices["commodity_guid"].drop_duplicates().tolist())
+        # guid_list = type(prices["commodity_guid"].drop_duplicates().tolist())
         if commodity in (prices["commodity_guid"].drop_duplicates().tolist()):
             commodity_mask = prices["commodity_guid"].str.match(commodity)
         else:
@@ -210,7 +204,7 @@ class GnuCash_Data_Analysis:
             pd.DataFrame: small df with the grouped and aggregated bids
         """
         prices = self.get_commodity_prices()  # .set_index("date").sort_index()
-        commodity_list = prices["commodity_guid"].unique().tolist()
+        # commodity_list = prices["commodity_guid"].unique().tolist()
         prices["cash"] = prices["value_num"] / prices["value_denom"]
         bids = prices[prices["type"].str.match("bid")].drop(
             columns=[
@@ -305,7 +299,7 @@ class GnuCash_Data_Analysis:
                     dates.append(new_date)
                 depreciation_codes.append("800")
                 accounts.append(account)
-                descriptions.append(f"Regular Depreciation")
+                descriptions.append("Regular Depreciation")
                 amount_per_term = get_amount_per_term(method)
                 amounts.append(amount_per_term * -1)
                 amount_left -= amount_per_term
@@ -444,7 +438,7 @@ class GnuCash_Data_Analysis:
             or main account for accrual
             When passing True, it will need to multiply the account totals by -1 to invert
             """
-            if inverse_multiplier == True:
+            if inverse_multiplier is True:
                 multiplier = "* -1"
                 inner_where = """
                 where

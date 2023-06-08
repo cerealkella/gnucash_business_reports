@@ -1,4 +1,3 @@
-import inspect
 from pathlib import Path
 
 import tomli
@@ -49,16 +48,3 @@ def get_gnucash_file_path(books: str = "business") -> Path:
 def get_excel_formatting():
     with open("templates/excel_styling.toml", "rb") as f:
         return tomli.load(f)
-
-
-def get_mapper(df_name=None):
-    try:
-        if df_name is not None:
-            df_name = df_name
-        else:
-            df_name = inspect.stack()[1].function.split("get_")[1]
-        with open("templates/mapper.toml", "rb") as f:
-            return tomli.load(f)[df_name]
-    except (KeyError, FileNotFoundError, IndexError) as e:
-        print(e)
-    return None
