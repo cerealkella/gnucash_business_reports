@@ -1162,7 +1162,7 @@ class GnuCash_Data_Analysis:
         df = pd.read_csv(
             self.load_file,
             parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
-            date_format="%m/%d/%y %H:M:S",
+            date_format="%m/%d/%y %H:%M:%S",
         )
         df.columns = df.columns.str.strip()
         log.info(df.head())
