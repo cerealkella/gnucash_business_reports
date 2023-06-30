@@ -121,6 +121,7 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.DataFrame: a dataframe with the matched accounts
         """
+        log.error(toml_series)
         column_name = toml_series.name
         match = toml_series[
             toml_series.str.contains(f"\[{str_to_match}\]").replace(
@@ -808,10 +809,7 @@ class GnuCash_Data_Analysis:
         dates = {
             "post_date": self.date_format,
         }
-        pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler()
-        pdw_personal.set_connection_string(
-            get_gnucash_file_path(books="personal"), db_type="sqlite"
-        )
+        pdw_personal = pd_db_wrangler.Pandas_DB_Wrangler(connect_string=get_gnucash_file_path(books="personal"))
         sql = pdw_personal.read_sql_file("sql/personal_business_expenses.sql")
         business_expenses = pdw_personal.df_fetch(
             sql.format(self.year), parse_dates=dates
@@ -1116,8 +1114,7 @@ class GnuCash_Data_Analysis:
 
     def get_joplin_notes(self, ticket_nums: list):
         self.joplin = get_config()["Joplin"]
-        pdw_joplin = pd_db_wrangler.Pandas_DB_Wrangler()
-        pdw_joplin.set_connection_string(self.joplin["joplin_db"], db_type="sqlite")
+        pdw_joplin = pd_db_wrangler.Pandas_DB_Wrangler(connect_string=self.joplin["joplin_db"])
         sql = "SELECT id as joplin_id, title FROM notes"
         sql += f""" WHERE title IN {["Scale Ticket " + str(x) for x in ticket_nums]}""".replace(
             "[",
@@ -1165,8 +1162,10 @@ class GnuCash_Data_Analysis:
         df = pd.read_csv(
             self.load_file,
             parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
+            date_format="%m/%d/%y %H:M:S",
         )
         df.columns = df.columns.str.strip()
+        log.info(df.head())
         return df
 
     def get_elevator_loads_with_commodity_ids(self):
