@@ -31,6 +31,7 @@ username = "my_username"
 # look only for files matching the beginning characters
 # specified in the file_match_pattern setting specified
 file_match_pattern = "XYDL"
+scale_ticket_pattern = "PDF_D_0015456_0099_"
 
 ["Joplin"]
 # used for storing images of receipts
