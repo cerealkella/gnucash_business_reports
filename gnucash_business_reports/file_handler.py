@@ -18,6 +18,13 @@ class MyHandler(FileSystemEventHandler):
             self.pattern_match = config["file_match_pattern"]
         else:
             self.pattern_match = None
+
+        self.pdf_match_len = len(config["scale_ticket_pattern"])
+        if self.match_len > 0:
+            self.pdf_pattern_match = config["scale_ticket_pattern"]
+        else:
+            self.pdf_pattern_match = None
+        self.move_path = Path(config["pdf_move_path"])
         self.gda = GnuCash_Data_Analysis()
 
     def valid_file(self, path):
@@ -39,8 +46,14 @@ class MyHandler(FileSystemEventHandler):
             # allow file to fully write
             if self.valid_file(path) > -1:
                 downloaded_file = Path(path)
+                log.info(downloaded_file)
+                log.info(self.pdf_pattern_match)
+                log.info(self.pdf_match_len)
                 if (
                     downloaded_file.name[: self.match_len] == self.pattern_match
+                    or downloaded_file.name[: self.pdf_match_len]
+                    == self.pdf_pattern_match
+                    or self.pdf_pattern_match is None
                     or self.pattern_match is None
                 ):
                     if downloaded_file.suffix.lower() == ".csv":
@@ -48,6 +61,14 @@ class MyHandler(FileSystemEventHandler):
                         self.gda.create_db_records_from_load_file(
                             downloaded_file, write_to_db=True
                         )
+                    elif downloaded_file.suffix.lower() == ".pdf":
+                        time.sleep(5)  # give the file time to write
+                        ticket_num = str(downloaded_file.name[self.pdf_match_len:]).lstrip("0")
+                        new_file_name = (
+                            f"Scale Ticket {ticket_num}"
+                        )
+                        log.info(new_file_name)
+                        downloaded_file.rename(self.move_path / new_file_name)
             else:
                 log.warning("invalid or incomplete file")
         except FileNotFoundError as e:

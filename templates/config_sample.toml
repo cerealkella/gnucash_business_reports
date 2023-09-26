@@ -32,6 +32,7 @@ username = "my_username"
 # specified in the file_match_pattern setting specified
 file_match_pattern = "XYDL"
 scale_ticket_pattern = "PDF_D_0015456_0099_"
+pdf_move_path = "$HOME/.joplin_upload"
 
 ["Joplin"]
 # used for storing images of receipts
