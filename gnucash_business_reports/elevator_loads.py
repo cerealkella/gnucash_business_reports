@@ -44,6 +44,7 @@ class Elevator:
         ).click()
 
     def download_scale_tix(self):
+        count = 0
         self.list_contracts()
         time.sleep(2)
         gnuc = GnuCash_Data_Analysis()
@@ -63,6 +64,7 @@ class Elevator:
                 log.info(f"Found Scale Ticket {scale_tickets[0]}")
                 existing_ticket = gnuc.get_existing_records(scale_tickets)
                 if len(existing_ticket) < 1:
+                    count += 1
                     log.info(f"Downloading Scale Ticket {scale_tickets[0]}")
                     self.driver.find_element(
                         By.XPATH,
@@ -75,20 +77,23 @@ class Elevator:
                 x += 1
         except NoSuchElementException:
             log.info("End of list")
-        self.close_browser()
-        return 0
+        log.info(f"{count} new scale tickets found!")
+        return count
 
     def download_elevator_csv(self):
-        self.list_contracts()
         time.sleep(5)
         log.info("Downloading .csv!")
         self.driver.find_element(
             By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div[1]/a"
         ).click()
+        return 0
+    
+    def process_loads(self):
+        if self.download_scale_tix() > 0:
+            self.download_elevator_csv()
         self.close_browser()
         return 0
 
 
 darth_elevator = Elevator()
-# darth_elevator.download_elevator_csv()
-darth_elevator.download_scale_tix()
+darth_elevator.process_loads()
