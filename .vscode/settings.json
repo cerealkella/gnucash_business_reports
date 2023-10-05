@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "/home/justin/mcmc-reports/.direnv",
+    "python.pythonPath": ".direnv",
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": false,
     "python.linting.pycodestyleEnabled": false,
@@ -13,7 +13,8 @@
     
     "python.linting.flake8Args": [
         "--max-line-length=120",
-        "--ignore=E402"
+        "--ignore=E402",
+        "--ignore=W503"
     ],
     "python.dataScience.jupyterServerURI": "local",
     "python.analysis.diagnosticSeverityOverrides": {"reportGeneralTypeIssues": "none"}
