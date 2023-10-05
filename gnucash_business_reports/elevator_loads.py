@@ -89,7 +89,10 @@ class Elevator:
         return 0
     
     def process_loads(self):
-        if self.download_scale_tix() > 0:
+        tix_to_process = self.download_scale_tix()
+        if tix_to_process > 0:
+            # allow the tickets to get processed into external app
+            time.sleep(10 * tix_to_process)
             self.download_elevator_csv()
         self.close_browser()
         return 0
