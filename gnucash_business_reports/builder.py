@@ -192,6 +192,7 @@ class GnuCash_Data_Analysis:
         prices = self.get_commodity_prices()  # .set_index("date").sort_index()
         # commodity_list = prices["commodity_guid"].unique().tolist()
         prices["cash"] = prices["value_num"] / prices["value_denom"]
+        prices.dropna(inplace=True)
         bids = prices[prices["type"].str.match("bid")].drop(
             columns=[
                 "guid",
