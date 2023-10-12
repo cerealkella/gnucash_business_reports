@@ -49,9 +49,10 @@ class Elevator:
         time.sleep(2)
         gnuc = GnuCash_Data_Analysis()
         x = 2
-        try:
-            while x < 500:
-                # arbitrary upper limit. Will exit loop when there's an exception
+        exception_count = 0
+        while x < 500:
+            # arbitrary upper limit. Will exit loop when there's an exception
+            try:
                 scale_tickets = []
                 scale_tickets.append(
                     int(
@@ -68,15 +69,19 @@ class Elevator:
                     log.info(f"Downloading Scale Ticket {scale_tickets[0]}")
                     self.driver.find_element(
                         By.XPATH,
-                        f"/html/body/div[2]/div[2]/div[2]/table/tbody/tr[{x}]/td[13]/a",
+                        f"/html/body/div[2]/div[2]/div[2]/table/tbody/tr[{x}]/td[13]/a"
                     ).click()
                 else:
                     log.info(
                         f"Scale Ticket {existing_ticket.index.values[0]} exists in db"
                     )
-                x += 1
-        except NoSuchElementException:
-            log.info("End of list")
+            except NoSuchElementException:
+                log.info(f"No such element at index {x}")
+                exception_count += 1
+                if exception_count > 5:
+                    log.info("End of list")
+                    break
+            x += 1
         log.info(f"{count} new scale tickets found!")
         return count
 
@@ -94,7 +99,7 @@ class Elevator:
             # allow the tickets to get processed into external app
             time.sleep(10 * tix_to_process)
             self.download_elevator_csv()
-        self.close_browser()
+        # self.close_browser()
         return 0
 
 
