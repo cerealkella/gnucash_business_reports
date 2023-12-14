@@ -113,27 +113,21 @@ class GnuCash_Data_Analysis:
         return self.all_accounts
 
     def toml_to_df(self, toml_series: pd.Series, str_to_match: str) -> pd.DataFrame:
-        """Get accounts matching a string to be passed in. Usually contains some
-        toml to parse.
+        """Get accounts matching a string to be passed in. Usually contains
+        some toml to parse.
 
         Make sure to pass a unique and meaningful index for the toml series
 
         Returns:
             pd.DataFrame: a dataframe with the matched accounts
         """
-        log.error(toml_series)
         column_name = toml_series.name
-        match = toml_series[
-            toml_series.str.contains(f"\[{str_to_match}\]").replace(
-                "\\n", "\n", regex=True
-            )
-            is True
-        ]
-        match = match[match.index.drop_duplicates()]  # match.drop_duplicates()
+        matched_series = toml_series[toml_series.str.contains(str_to_match)]
+        first_toml_str = matched_series.iloc[0]
         keys = get_keys(
-            match[0], str_to_match
-        )  # this assumes the first account will have all the keys we need
-        df = match.to_frame()
+            first_toml_str, str_to_match
+        )  # this assumes the first matched row will have all the keys
+        df = matched_series.to_frame()
         # populate columns into dataframe using keys from get_keys
         for key in keys:
             df[key] = df[column_name].apply(lambda x: parse_toml(x, str_to_match, key))
@@ -1053,7 +1047,6 @@ class GnuCash_Data_Analysis:
             year.
         """
         terms = self.get_invoices().set_index("operation_id")["org_notes"]
-        terms = terms[terms.index.drop_duplicates()]
         terms = self.toml_to_df(terms, "Vendor_Details")
 
         df = terms.reset_index().drop(columns=["org_notes", "Receive_1099", "Min"])
