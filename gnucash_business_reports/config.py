@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import tomli
+import tomllib
 from appdirs import AppDirs
 
 
@@ -26,7 +26,7 @@ def get_logdir() -> Path:
 
 def get_config() -> dict:
     with open(get_datadir().joinpath("config.toml"), "rb") as f:
-        return tomli.load(f)
+        return tomllib.load(f)
 
 
 def get_gnucash_file_path(books: str = "business") -> Path:
@@ -47,4 +47,4 @@ def get_gnucash_file_path(books: str = "business") -> Path:
 
 def get_excel_formatting():
     with open("templates/excel_styling.toml", "rb") as f:
-        return tomli.load(f)
+        return tomllib.load(f)
