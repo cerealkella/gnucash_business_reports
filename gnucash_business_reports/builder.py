@@ -462,7 +462,8 @@ class GnuCash_Data_Analysis:
                 if guid == guids[0]:
                     all_tx = tx
                 else:
-                    all_tx = pd.concat([all_tx, tx])
+                    if not tx.empty:
+                        all_tx = pd.concat([all_tx, tx])
             return all_tx
 
         for account in acct_types:
@@ -1387,7 +1388,7 @@ class GnuCash_Data_Analysis:
 
         # *** TOTALS ***
         account_totals = tx.groupby(["account_type"]).sum(numeric_only=True)
-        net_cash_flow = round(account_totals.sum(numeric_only=True)[0], 2)
+        net_cash_flow = round(account_totals.sum(numeric_only=True).iloc[0], 2)
         account_totals.loc["TOTAL (NET)"] = net_cash_flow
 
         last_year_mask = all_tx["post_date"].dt.year < self.year
