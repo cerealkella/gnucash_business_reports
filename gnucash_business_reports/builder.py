@@ -1122,6 +1122,13 @@ class GnuCash_Data_Analysis:
         del pdw_joplin
         return joplin_notes.set_index("num").drop(columns="title")
 
+    def joplin_note_query(self, where_clause=""):
+        self.joplin = get_config()["Joplin"]
+        pdw_joplin = pd_db_wrangler.Pandas_DB_Wrangler(connect_string=self.joplin["joplin_db"])
+        sql = pdw_joplin.read_sql_file("sql/joplin_base_query.sql")
+        sql += where_clause
+        return(pdw_joplin.df_fetch(sql))
+
     def get_associated_uris(self, tx_df: pd.DataFrame):
         """find existing assoc_uris from db"""
 
