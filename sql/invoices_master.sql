@@ -1,3 +1,42 @@
+/*
+ ~ 2015 = initial creation of SQL
+ 2024-01-13
+ Added due date from the slots table
+ */
+/*pandas*
+timezone = "America/Chicago"
+[parse_dates]
+date_posted = {format = "%Y-%m-%d %H:%M:%S", errors = "coerce", exact = false}
+date_opened = "%Y-%m-%d %H:%M:%S"
+entry_date = "%Y-%m-%d %H:%M:%S"
+due_date = "%Y-%m-%d %H:%M:%S"
+[dtype]
+inv_type = "string"
+inv_guid = "string"
+inv_id = "string"
+billing_id = "string"
+notes = "string"
+post_txn = "string"
+operation_id = "string"
+operation = "string"
+org_name = "string"
+org_notes = "string"
+account_guid = "string"
+account_code = "string"
+account_name = "string"
+entry_guid = "string"
+inv_acct = "string"
+description = "string"
+quantity_type = "string"
+paytype = "string"
+disc_how = "string"
+disc_type = "string"
+taxable = "string"
+taxincluded = "string"
+taxtable = "string"
+entry_type = "string"
+*pandas*/
+
 select
 	/* invoices */
 	'BILL' as inv_type,
