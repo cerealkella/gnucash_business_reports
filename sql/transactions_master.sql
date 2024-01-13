@@ -23,6 +23,18 @@
  '12eaddcc39718c4582d8b69f22263126'
  
  */
+/*pandas*
+timezone = "America/Chicago"
+[parse_dates]
+post_date = {format = "%Y-%m-%d %H:%M:%S", errors = "coerce", exact = false}
+enter_date = "%Y-%m-%d %H:%M:%S"
+reconcile_date = "%Y-%m-%d %H:%M:%S"
+[dtype]
+account_type = "string"
+description = "string"
+account_code = "string"
+*pandas*/
+
 SELECT
 	/* accounts */
 	a.account_type,
