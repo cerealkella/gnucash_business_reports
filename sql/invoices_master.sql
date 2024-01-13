@@ -33,7 +33,8 @@ select
 	entries.b_taxincluded as taxincluded,
 	entries.b_taxtable as taxtable,
 	entries.action as entry_type,
-	entries."date" as entry_date
+	entries."date" as entry_date,
+	tx_due.due_date as due_date
 from
 	entries
 join accounts on
@@ -60,6 +61,15 @@ join (
 	join vendors on
 		vendors.guid = jobs.owner_guid ) as owner_job on
 	owner_job.guid = invoices.owner_guid
+left join (
+	select
+		slots.timespec_val as due_date,
+		slots.obj_guid
+	from
+		slots
+	WHERE
+		slots.name = 'trans-date-due') as tx_due on
+	tx_due.obj_guid = invoices.post_txn
 union select
 	/* invoices */
 	'INVOICE' as inv_type,
@@ -95,7 +105,8 @@ union select
 	entries.i_taxincluded as taxincluded,
 	entries.i_taxtable as taxtable,
 	entries.action as entry_type,
-	entries."date" as entry_date
+	entries."date" as entry_date,
+	tx_due.due_date as due_date
 from
 	entries
 join accounts on
@@ -114,3 +125,12 @@ join (
 	join customers on
 		customers.guid = jobs.owner_guid ) as owner_job on
 	owner_job.guid = invoices.owner_guid
+left join (
+	select
+		slots.timespec_val as due_date,
+		slots.obj_guid
+	from
+		slots
+	WHERE
+		slots.name = 'trans-date-due') as tx_due on
+	tx_due.obj_guid = invoices.post_txn
