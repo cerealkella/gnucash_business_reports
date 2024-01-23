@@ -19,7 +19,7 @@ Liabilities = 100
 Cash = 70
 Grain = 70
 
-["Elevator"]
+[Elevator]
 elevator_name = "Farmers Coop"
 loads_path = "/home/user/Downloads/download99999.CSV"
 
@@ -34,8 +34,22 @@ file_match_pattern = "XYDL"
 scale_ticket_pattern = "PDF_D_0015456_0099_"
 pdf_move_path = "$HOME/.joplin_upload"
 
-["Joplin"]
+[Joplin]
 # used for storing images of receipts
 joplin_db = "/home/user/.config/joplin-desktop/database.sqlite"
 joplin_uri_prefix = "joplin://x-callback-url/openNote?id="
 joplin_api_token = "biglongstring0fl3ttersandNumb3rs"
+
+# Excel Formatting
+# used to create nice clean looking Excel Spreadsheets
+[header]
+bold = true
+text_wrap = true
+valign = "top"
+fg_color = "#5DADE2"
+font_color = "#FFFFFF"
+border = 1
+
+[currency]
+num_format = "$#,##0.00"
+bold = false
