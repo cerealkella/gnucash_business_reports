@@ -45,6 +45,8 @@ def get_gnucash_file_path(books: str = "business") -> Path:
     return get_config()["GNUCash"][f"{books}_path"]
 
 
-def get_excel_formatting():
-    with open("templates/excel_styling.toml", "rb") as f:
-        return tomllib.load(f)
+def get_excel_formatting() -> dict:
+    excel = {}
+    excel["header"] = get_config()["header"]
+    excel["currency"] = get_config()["currency"]
+    return excel
