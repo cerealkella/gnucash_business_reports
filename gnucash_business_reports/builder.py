@@ -121,6 +121,7 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.DataFrame: a dataframe with the matched accounts
         """
+        toml_series = toml_series.dropna()
         column_name = toml_series.name
         matched_series = toml_series[toml_series.str.contains(str_to_match)]
         first_toml_str = matched_series.iloc[0]
@@ -304,11 +305,11 @@ class GnuCash_Data_Analysis:
                         depreciation_schedule,
                         build_depreciation_schedule(
                             df.index[i],
-                            df["Cost"][i],
-                            df["Sec_179"][i],
-                            df["Method"][i],
-                            df["Years"][i],
-                            df["Date_in_Service"][i],
+                            df["Cost"].iloc[i],
+                            df["Sec_179"].iloc[i],
+                            df["Method"].iloc[i],
+                            df["Years"].iloc[i],
+                            df["Date_in_Service"].iloc[i],
                         ),
                     ]
                 )
@@ -823,7 +824,7 @@ class GnuCash_Data_Analysis:
             2,
         )
         business_expenses.to_csv(f"export/{self.year}-personal-farm-expenses.csv")
-        return business_expenses.groupby("Acct")["Amt", "Deduct_Total"].sum()
+        return business_expenses.groupby("Acct").sum(["Amt", "Deduct_Total"])
 
     def get_1099_personal_vendors(self):
         dates = {
@@ -1190,6 +1191,10 @@ class GnuCash_Data_Analysis:
         df.loc[df["Crop Description"].str.match("CORN"), "crop"] = "Corn"
         df.loc[df["Crop Description"].str.match("BEANS"), "crop"] = "Soybeans"
         commodities = self.get_commodity_bids().set_index("crop")
+        price_count = len(commodities)
+        log.info(f"{price_count} commodity price entries for {self.year}")
+        if price_count < 1:
+            log.warning("No prices exist for commodity, this is likely to cause problems")
         df = df.join(commodities, on="crop")
         df["enter_date"] = datetime.now()
         df["description"] = self.elevator["elevator_name"]
@@ -1405,6 +1410,9 @@ class GnuCash_Data_Analysis:
         all_tx[chk_mask & year_mask].groupby(["src_code", "src_name"]).sum(
             numeric_only=True
         ).to_csv(f"export/{self.year}-cash.csv")
+        all_tx[chk_mask & last_year_mask].groupby(["src_code", "src_name"]).sum(
+            numeric_only=True
+        ).to_csv(f"export/{self.year - 1}-cash.csv")
         ar_mask = all_tx["src_type"].str.match("RECEIVABLE")
         ap_mask = all_tx["src_type"].str.match("PAYABLE")
 
