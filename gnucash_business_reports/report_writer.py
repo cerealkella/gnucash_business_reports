@@ -159,13 +159,13 @@ gda = GnuCash_Data_Analysis()
 gda.year = 2023
 
 build_report(gda)
-production_data(gda)
+# production_data(gda)
 # grain_invoices(gda)
-gda.flexible_lease_calculator().to_csv(f"export/{gda.year}-bonuses.csv")
+# gda.flexible_lease_calculator().to_csv(f"export/{gda.year}-bonuses.csv")
 gda.sanity_checker()
 
 # reports to run for tax purposes
-# gda.get_1099_personal_vendors()
+gda.get_1099_personal_vendors()
 # gda.get_1099_vendor_report()
 # gda.generate_wage_reports()
-# gda.get_personal_business_expenses()
+gda.get_personal_business_expenses()
