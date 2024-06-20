@@ -53,3 +53,15 @@ border = 1
 [currency]
 num_format = "$#,##0.00"
 bold = false
+
+[[display_websites]]
+uri="https://amazon.com"
+duration=3
+
+[[display_websites]]
+uri="https://www.espn.com"
+duration=3
+
+[[display_websites]]
+site="https://www.google.com"
+duration=5
