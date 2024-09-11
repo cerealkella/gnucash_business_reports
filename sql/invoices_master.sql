@@ -17,6 +17,7 @@ inv_id = "string"
 billing_id = "string"
 notes = "string"
 post_txn = "string"
+post_lot = "string"
 operation_id = "string"
 operation = "string"
 org_name = "string"
@@ -47,6 +48,7 @@ select
 	invoices.billing_id,
 	invoices.notes,
 	invoices.post_txn,
+	invoices.post_lot,
 	/* billto/owner */
 	billto.id as operation_id,
 	billto.name as operation,
@@ -119,6 +121,7 @@ union select
 	invoices.billing_id,
 	invoices.notes,
 	invoices.post_txn,
+	invoices.post_lot,
 	/* billto/owner */
 	owner_job.id as operation_id,
 	owner_job.name as operation,
