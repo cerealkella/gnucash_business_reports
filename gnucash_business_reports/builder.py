@@ -533,7 +533,7 @@ class GnuCash_Data_Analysis:
             self.fetch_transactions(["STOCK"], False), "post_date", True
         )
 
-    def get_commodity_stock_values(self) -> pd.DataFrame:
+    def get_commodity_stock_values(self, groupby: list = ["commodity_guid"]) -> pd.DataFrame:
         """_summary_
 
         Returns:
@@ -541,7 +541,7 @@ class GnuCash_Data_Analysis:
         """
         df = (
             self.get_stock()
-            .groupby("commodity_guid")
+            .groupby(groupby)
             .sum(numeric_only=True)
             .join(self.get_commodity_bids(how="last").set_index("commodity_guid"))
         )
@@ -1380,17 +1380,26 @@ class GnuCash_Data_Analysis:
         inv_mask = all_inv["inv_type"] == "INVOICE"
         invoices = all_inv[year_mask & inv_mask & code_mask]
         grain = invoices.groupby(
-            ["date_posted", "inv_id", "account_name", "org_name"]
+            ["date_posted", "due_date", "inv_id", "account_name", "account_code", "org_name", "post_lot"]
         ).sum(numeric_only=True)
         grain["Price"] = grain["amount"] / grain["quantity"]
+        # 2024-09-13 added payment status
+        payment_query = self.pdw.read_sql_file("sql/payments.sql")
+        payments = self.pdw.df_fetch(payment_query).groupby("lot_guid").sum()
+        grain = grain.join(payments, on="post_lot")
+        grain["paid"] = round(grain["amount"],2) == abs(round(grain["payment_amt"],2))
+        grain.drop(columns=["payment_amt"], inplace=True)
         return grain.reset_index().rename(
             columns={
-                "date_posted": "Date",
+                "date_posted": "Contract Date",
+                "due_date": "Delivery Date",
                 "inv_id": "Invoice",
                 "account_name": "Crop",
                 "org_name": "Elevator",
                 "quantity": "Bushels",
                 "amount": "Amount",
+                "paid": "Fulfilled",
+                "account_code": "Code",
             }
         )
 
