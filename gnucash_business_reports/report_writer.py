@@ -150,22 +150,22 @@ def grain_invoices(gda):
         for col, value in enumerate(df.columns.values):
             sheet.write(0, col, value, fmt_header)
         fmt_currency = workbook.add_format({"num_format": "$#,##0.00", "bold": False})
-        sheet.set_column("F:G", 10, fmt_currency)
+        sheet.set_column("H:I", 10, fmt_currency)
 
     writer.close()
 
 
 gda = GnuCash_Data_Analysis()
-gda.year = 2023
+gda.year = 2024
 
 build_report(gda)
 # production_data(gda)
-# grain_invoices(gda)
+grain_invoices(gda)
 # gda.flexible_lease_calculator().to_csv(f"export/{gda.year}-bonuses.csv")
 gda.sanity_checker()
 
 # reports to run for tax purposes
-gda.get_1099_personal_vendors()
+# gda.get_1099_personal_vendors()
 # gda.get_1099_vendor_report()
 # gda.generate_wage_reports()
-gda.get_personal_business_expenses()
+# gda.get_personal_business_expenses()
