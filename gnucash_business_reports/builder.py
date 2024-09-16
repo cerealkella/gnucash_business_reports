@@ -579,6 +579,23 @@ class GnuCash_Data_Analysis:
         )
         # balance_sheet.loc["Grain"] = (grain["value"][0], grain["qty"][0])
         return pd.concat([balance_sheet, grain])
+    
+    def get_all_transactions(self) -> pd.DataFrame:
+        """ 2024-09-16 JRK
+        don't use this for much! it's just a mess of transactions
+        initial creation for the purposes of running aggregate functions
+        against the transactions (max date for latest transaction)
+
+        Returns:
+            pd.Dataframe: dataframe containing desired transactions
+            sorted by post dates
+        """
+        sql = self.pdw.read_sql_file("sql/all_transactions.sql")
+        return (
+            self.pdw.df_fetch(sql)
+            .reset_index()
+            .sort_values(by=["post_date"])
+        )
 
     def get_all_cash_transactions(self) -> pd.DataFrame:
         """calls fetch transactions passing the necessary account types
