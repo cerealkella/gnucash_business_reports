@@ -19,6 +19,10 @@ Liabilities = 100
 Cash = 70
 Grain = 70
 
+[Paths]
+invoices="/home/user/Documents/invoices"
+reports="/home/user/Documents/reports"
+
 [Elevator]
 elevator_name = "Farmers Coop"
 loads_path = "/home/user/Downloads/download99999.CSV"

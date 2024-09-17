@@ -2,13 +2,18 @@ import shutil
 
 import requests
 
+from pathlib import Path
 from .config import get_config
 
 
-def download_file(url: str):
+def download_file(url: str, path: Path):
     with requests.get(url, stream=True) as r:
-        with open(local_filename, "wb") as f:
+        with open(path, "wb") as f:
             shutil.copyfileobj(r.raw, f)
+
+
+def get_invoice_path() -> Path:
+    return Path(get_config()["Paths"]["invoices"])
 
 
 def get_joplin_token() -> str:
@@ -40,6 +45,6 @@ print(resource_id)
 note_file = requests.get(
     f"""{JOPLIN_HOST}resources/{resource_id}/{JOPLIN_SUFFIX}"""
 ).json()
-local_filename = f"""export/{note_file["title"]}"""
+local_filename = f"""{get_invoice_path()}/{note_file["title"]}"""
 note_file_url = f"""{JOPLIN_HOST}resources/{resource_id}/file/{JOPLIN_SUFFIX}"""
-download_file(note_file_url)
+download_file(note_file_url, local_filenamegit)
