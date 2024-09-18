@@ -1419,6 +1419,9 @@ class GnuCash_Data_Analysis:
                 "account_code": "Code",
             }
         )
+    
+    def get_config(self):
+        return get_config()
 
     def sanity_checker(self) -> bool:
         all_tx = self.get_all_cash_transactions()
