@@ -3,6 +3,7 @@ import time
 import keyring
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
 from .builder import GnuCash_Data_Analysis
@@ -10,9 +11,12 @@ from .config import get_config
 from .logger import log
 
 
+options = Options()
+options.add_argument('--headless=new')
+
 class Elevator:
     config = get_config()["Elevator"]
-    driver = webdriver.Chrome()  # Or Firefox(), or Ie(), or Opera()
+    driver = webdriver.Chrome(options=options)  # Or Firefox(), or Ie(), or Opera()
     driver.get(config["webpage"])
 
     def __init__(self):
