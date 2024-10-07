@@ -1,17 +1,15 @@
 import time
 import keyring
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
-from .builder import GnuCash_Data_Analysis
 from .config import get_config
 from .logger import log
 
 
 options = Options()
-options.add_argument('--headless=new')
+# options.add_argument('--headless=new')
 
 class Production:
     config = get_config()["Production"]
