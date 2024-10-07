@@ -38,6 +38,12 @@ file_match_pattern = "XYDL"
 scale_ticket_pattern = "PDF_D_0015456_0099_"
 pdf_move_path = "$HOME/.joplin_upload"
 
+[Production]
+# Production data from John Deere
+webpage = "https://map.deere.com"
+reports = "https://work-analyzer.deere.com"
+username = "myJDusername"
+
 [Joplin]
 # used for storing images of receipts
 joplin_db = "/home/user/.config/joplin-desktop/database.sqlite"
