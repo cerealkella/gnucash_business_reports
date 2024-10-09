@@ -56,6 +56,19 @@ class GnuCash_Data_Analysis:
         else:
             return df
 
+    def db_locked(self) -> bool:
+        """ Checks to see if database is in use prior to performing
+            any write operations
+        Returns:
+            bool: True if locked, False if not locked.
+        """
+        df_lock = self.pdw.df_fetch("SELECT * FROM gnclock")
+        if len(df_lock) > 0:
+            log.warning("DATABASE IS LOCKED BY %s", df_lock["Hostname"])
+            return True
+        else:
+            return False
+
     def get_all_accounts(self) -> pd.DataFrame:
         """ Get all accounts from the database """
         if self.all_accounts is None:
@@ -1344,6 +1357,11 @@ class GnuCash_Data_Analysis:
 
             if write_to_db:
                 log.warning("Attempting to write dataframes to the database!")
+                log.warning("Checking for database lock...")
+                if self.db_locked():
+                    log.error("Database locked, cannot proceed.")
+                    return -1
+                log.warning("Database not locked. Proceeding...")
                 tx_len = len(transactions)
                 if tx_len > 0 and len(splits) == tx_len * 2:
                     transactions.to_sql(
@@ -1358,6 +1376,7 @@ class GnuCash_Data_Analysis:
                     log.warning("Updated Database!")
                 else:
                     log.warning("No new records to process, db not updated!")
+                return 0
             else:
                 pass
         except ValueError as e:
@@ -1487,9 +1506,3 @@ class GnuCash_Data_Analysis:
         log.warning(" -- We balance, right? ----------------- {}".format(sanity))
         log.warning("Difference = {}".format(round(net - ending_chk_bal, 2)))
         return sanity
-
-
-# year = 2022
-# gda = GnuCash_Data_Analysis()
-
-# gda.sanity_checker()
