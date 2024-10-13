@@ -9,7 +9,7 @@ from .logger import log
 
 
 options = Options()
-# options.add_argument('--headless=new')
+options.add_argument('--headless=new')
 
 class Production:
     config = get_config()["Production"]
