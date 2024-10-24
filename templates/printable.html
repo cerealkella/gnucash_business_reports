@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="printable.css" />
+</head>
+
+<body>
+
+  <div class="page-header" style="text-align: center">
+    <h1>{{ details.report_name }}</h1>
+  </div>
+
+  <div class="page-footer" style="text-align: center">
+    {{ details.organization_name }}
+  </div>
+
+  <table>
+
+    <thead>
+      <tr>
+        <td>
+          <!--place holder for the fixed-position header-->
+          <div class="page-header-space"></div>
+        </td>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr>
+        <td>
+          <!--*** CONTENT GOES HERE ***-->
+          <div class="page">
+            {{ guts }}
+          </div>
+        </td>
+      </tr>
+    </tbody>
+
+    <tfoot>
+      <tr>
+        <td>
+          <!--place holder for the fixed-position footer-->
+          <div class="page-footer-space"></div>
+        </td>
+      </tr>
+    </tfoot>
+
+  </table>
+
+</body>
+
+</html>
