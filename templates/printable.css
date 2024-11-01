@@ -19,7 +19,7 @@ body{
     bottom: 0;
     width: 100%;
     border-top: 1px solid black;
-    background: yellow;
+    background: #e0e6e9;
 }
 
 .page-header {
@@ -27,11 +27,15 @@ body{
     top: 0mm;
     width: 100%;
     border-bottom: 1px solid black;
-    background: yellow;
+    background: #e0e6e9;
 }
 
 .page {
     page-break-after: always;
+}
+
+tr:nth-child(even) {
+    background-color: #e0e6e9;
 }
 
 @page {
