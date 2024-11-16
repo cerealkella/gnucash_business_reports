@@ -70,6 +70,26 @@ class GnuCash_Data_Analysis:
         else:
             return False
 
+    def add_descriptor_column(
+        self,
+        df: pd.DataFrame,
+        column_to_match: str,
+        initial_value: str = None,
+        strings_to_match: list = ["Corn", "Soybeans"],
+        new_column: str = "crop",
+    ) -> pd.DataFrame:
+        """Adds new column to dataframe
+        the primary purpose this function was created is to add
+        a crop column to a dataframe using an account heirarchy
+        column
+        """
+
+        if initial_value is not None:
+            df[new_column] = initial_value
+        for match in strings_to_match:
+            df.loc[df[column_to_match].str.contains(match), new_column] = match
+        return df
+
     def get_all_accounts(self) -> pd.DataFrame:
         """Get all accounts from the database"""
         if self.all_accounts is None:
@@ -94,12 +114,16 @@ class GnuCash_Data_Analysis:
                         return "" + find_parent(value)
                     return str(id_name_dict.get(value)) + ">" + find_parent(value)
 
-            def get_third_level(x) -> str:
-                """For the Finpack report, we want the 3rd Level of acct categories"""
+            def get_level(x: str, level: int) -> str:
+                """
+                Pass in the string to split (acct heirarchy) and the level
+                we're looking for.
+                For the Finpack report, we want the 4th Level of acct categories
+                """
                 parents = x.split(">")
                 level_count = len(parents)
-                if level_count > 2:
-                    return str(parents[level_count - 3])
+                if level_count > level-1:
+                    return str(parents[level_count - level])
                 else:
                     return ""
 
@@ -107,18 +131,14 @@ class GnuCash_Data_Analysis:
                 df["guid"].apply(lambda x: find_parent(x)).str.rstrip(">")
             )
             df["finpack_account"] = df["parent_accounts"].apply(
-                lambda x: get_third_level(x)
+                lambda x: get_level(x, 4)
             )
             df.loc[df["finpack_account"] == "", "finpack_account"] = df["name"]
 
             df.set_index("guid", drop=True, inplace=True)
 
-            # Enterprise Column
-            df["crop"] = "General"
-            df.loc[df["parent_accounts"].str.contains("Soybeans"), "crop"] = "Soybeans"
-            df.loc[df["parent_accounts"].str.contains("Corn"), "crop"] = "Corn"
-            df.loc[df["name"].str.contains("Soybeans"), "crop"] = "Soybeans"
-            df.loc[df["name"].str.contains("Corn"), "crop"] = "Corn"
+            df = self.add_descriptor_column(df, "parent_accounts", initial_value="General")
+            df = self.add_descriptor_column(df, "name")
 
             # Create CSV with Parental Tree for reporting
             df.to_csv(f"{self.data_directory}/ALL_ACCOUNTS_W_PARENTS.csv")
@@ -549,13 +569,14 @@ class GnuCash_Data_Analysis:
     def get_commodity_stock_values(
         self, groupby: list = ["commodity_guid"]
     ) -> pd.DataFrame:
-        """_summary_
+        """Leverages get_stock to build a dataframe containing grain
+        values.
 
         Returns:
-            pd.DataFrame: _description_
+            pd.DataFrame: dataframe with grain values
         """
         df = (
-            self.get_stock()
+            self.add_descriptor_column(self.get_stock(), "parent_accounts")
             .groupby(groupby)
             .sum(numeric_only=True)
             .join(self.get_commodity_bids(how="last").set_index("commodity_guid"))
@@ -1489,12 +1510,15 @@ class GnuCash_Data_Analysis:
         year_mask = all_inv["date_posted"].dt.year == self.year
         code_mask = all_inv["account_code"].str.match("133|134")
         inv_mask = all_inv["inv_type"] == "INVOICE"
-        invoices = all_inv[year_mask & inv_mask & code_mask]
+        invoices = all_inv[year_mask & inv_mask & code_mask].join(
+            self.get_all_accounts()["crop"], on="account_guid", rsuffix="_acct"
+        )
         grain = invoices.groupby(
             [
                 "date_posted",
                 "due_date",
                 "inv_id",
+                "crop",
                 "account_name",
                 "account_code",
                 "org_name",
@@ -1513,7 +1537,7 @@ class GnuCash_Data_Analysis:
                 "date_posted": "Contract Date",
                 "due_date": "Delivery Date",
                 "inv_id": "Invoice",
-                "account_name": "Crop",
+                "crop": "Crop",
                 "org_name": "Elevator",
                 "quantity": "Bushels",
                 "amount": "Amount",
