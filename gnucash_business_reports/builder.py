@@ -122,7 +122,7 @@ class GnuCash_Data_Analysis:
                 """
                 parents = x.split(">")
                 level_count = len(parents)
-                if level_count > level-1:
+                if level_count > level - 1:
                     return str(parents[level_count - level])
                 else:
                     return ""
@@ -137,7 +137,9 @@ class GnuCash_Data_Analysis:
 
             df.set_index("guid", drop=True, inplace=True)
 
-            df = self.add_descriptor_column(df, "parent_accounts", initial_value="General")
+            df = self.add_descriptor_column(
+                df, "parent_accounts", initial_value="General"
+            )
             df = self.add_descriptor_column(df, "name")
 
             # Create CSV with Parental Tree for reporting
@@ -742,7 +744,7 @@ class GnuCash_Data_Analysis:
         return balance_sheet.drop(columns=["qty"])
 
     def get_trend_data(
-        self, func: Callable, years_to_go_back: int, index_col: str, trend_col: str
+        self, func: Callable, years_to_go_back: int, index_cols: list, trend_col: str
     ) -> pd.DataFrame:
         """Attempts to build trend analysis when provided a function.
         User defines how many years to go back, and on which columns
@@ -763,13 +765,13 @@ class GnuCash_Data_Analysis:
             df = func()
             df["year"] = self.year
             if x == 0:
-                trend_df = df.set_index(["year", index_col])
+                trend_df = df.set_index(["year"] + index_cols)
             else:
-                trend_df = pd.concat([trend_df, df.set_index(["year", index_col])])
+                trend_df = pd.concat([trend_df, df.set_index(["year"] + index_cols)])
         self.year = original_year
 
         return pd.pivot_table(
-            trend_df, values=trend_col, index=index_col, columns="year"
+            trend_df, values=trend_col, index=index_cols, columns="year"
         ).fillna(0)
 
     def trendsetter(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -812,22 +814,44 @@ class GnuCash_Data_Analysis:
     def iconize(self, column):
         return column.str.lower() + ".png"
 
-    def get_summary_by_account(self, include_depreciation=False):
+    def get_summary(self, groupby: list, include_depreciation=False):
         return (
             self.get_farm_cash_transactions(include_depreciation=include_depreciation)
             .sort_values("account_code")
-            .groupby(["account_code", "account_name"])
+            .groupby(groupby)
             .sum(["quantity", "amt"])
             .reset_index()
-            .rename(
-                columns={
-                    "account_code": "Code",
-                    "account_name": "Account",
-                    "amt": "Amount",
-                    "quantity": "Quantity",
-                }
-            )[["Code", "Account", "Quantity", "Amount"]]
         )
+
+    def get_summary_by_account(self, include_depreciation=False):
+        return self.get_summary(
+            groupby=["account_code", "account_name"],
+            include_depreciation=include_depreciation,
+        ).rename(
+            columns={
+                "account_code": "Code",
+                "account_name": "Account",
+                "amt": "Amount",
+                "quantity": "Quantity",
+            }
+        )[
+            ["Code", "Account", "Quantity", "Amount"]
+        ]
+
+    def get_summary_by_finpack_account(self, include_depreciation=False):
+        return self.get_summary(
+            groupby=["account_type", "finpack_account"],
+            include_depreciation=include_depreciation,
+        ).rename(
+            columns={
+                "account_type": "Type",
+                "finpack_account": "Account",
+                "amt": "Amount",
+                "quantity": "Quantity",
+            }
+        )[
+            ["Type", "Account", "Quantity", "Amount"]
+        ]
 
     def get_executive_summary(self, include_depreciation=False):
         df = (
