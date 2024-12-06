@@ -693,18 +693,21 @@ class GnuCash_Data_Analysis:
 
             # Income accounts filtered out, now re-classify inventory accounts
             # as income
+            tx.loc[tx["account_code"].str.startswith("133"), "account_name"] = "Corn"
+            tx.loc[tx["account_code"].str.startswith("134"), "account_name"] = "Soybeans"
             tx.loc[tx["account_code"].str.match("133|134"), "account_type"] = "INCOME"
             tx.loc[tx["account_code"].str.startswith("133"), "account_code"] = "301c"
-            tx.loc[tx["account_code"].str.startswith("133"), "account_name"] = "Corn"
             tx.loc[tx["account_code"].str.startswith("134"), "account_code"] = "303b"
 
             # Classify Prepaids as Expense
-            tx.loc[tx["account_code"].str.match("146"), "account_type"] = "EXPENSE"
+            tx.loc[tx["account_code"].str.match("146|147"), "account_type"] = "EXPENSE"
 
             # Classify Non-Taxable Expenses
             tx.loc[tx["account_code"].str.startswith("9"), "account_type"] = (
                 "NF EXPENSE"
             )
+
+            tx.to_csv(f"{self.data_directory}/FARM_TRANSACTIONS.csv")
 
             return tx.sort_values(by=["account_code", "post_date"])
 
@@ -1637,3 +1640,8 @@ class GnuCash_Data_Analysis:
         log.warning(" -- We balance, right? ----------------- {}".format(sanity))
         log.warning("Difference = {}".format(round(net - ending_chk_bal, 2)))
         return sanity
+
+gda = GnuCash_Data_Analysis()
+gda.year = 2024
+
+gda.get_farm_cash_transactions()
