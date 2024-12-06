@@ -38,10 +38,6 @@ tr:nth-child(even) {
     background-color: #e0e6e9;
 }
 
-@page {
-    margin: 5mm
-}
-
 @media print {
     thead {
         display: table-header-group;
@@ -59,4 +55,23 @@ tr:nth-child(even) {
         margin: 0;
     }
     .pagebreak { page-break-before: always; } /* page-break-after works, as well */
+
+    a::after {
+        content: " (" attr(href) ") ";
+      }
+      pre {
+        white-space: pre-wrap;
+      }
+      @page {
+        margin: 0.5in;
+        size: Letter;
+        @bottom-right {
+          content: counter(page);
+        }
+      }
+      @page :first {
+        @bottom-right {
+          content: "";
+        }
+      }
 }
