@@ -694,7 +694,9 @@ class GnuCash_Data_Analysis:
             # Income accounts filtered out, now re-classify inventory accounts
             # as income
             tx.loc[tx["account_code"].str.startswith("133"), "account_name"] = "Corn"
-            tx.loc[tx["account_code"].str.startswith("134"), "account_name"] = "Soybeans"
+            tx.loc[tx["account_code"].str.startswith("134"), "account_name"] = (
+                "Soybeans"
+            )
             tx.loc[tx["account_code"].str.match("133|134"), "account_type"] = "INCOME"
             tx.loc[tx["account_code"].str.startswith("133"), "account_code"] = "301c"
             tx.loc[tx["account_code"].str.startswith("134"), "account_code"] = "303b"
@@ -1240,8 +1242,34 @@ class GnuCash_Data_Analysis:
         df["adj_rent"] = round((df["bonus"] + df["amt"]) / df["acres"], 2)
         df["price"] = round(df["price"], 2)
         return df.drop(
-            columns=["amt", "Percentage", "commodity_guid", "operation_id"]
-        ).rename(index=str, columns={"operation": "field", "org_name": "owner"})
+            columns=[
+                "amt",
+                "Percentage",
+                "commodity_guid",
+                "operation_id",
+                "currency_guid",
+            ]
+        ).rename(
+            index=str,
+            columns={
+                "crop": "Crop",
+                "operation": "Field",
+                "org_name": "Owner",
+                "acres": "Acres",
+                "base_rent": "Base Rent",
+                "total_bushels": "Total Bushels",
+                "bu_per_acre": "Bu/Acre",
+                "price": "Price",
+                "rent_cap": "Rent Cap",
+                "rev_pct": "Revenue %",
+                "revenue": "Revenue",
+                "capped_total": "Capped Total",
+                "capped_bonus": "Capped Bonus",
+                "raw_bonus": "Raw Bonus",
+                "bonus": "Bonus",
+                "adj_rent": "Adjusted Rent",
+            },
+        )
 
     def get_existing_records(
         self, identifiers: list, table: str = "TRANSACTIONS", column: str = "num"
@@ -1540,6 +1568,18 @@ class GnuCash_Data_Analysis:
         invoices = all_inv[year_mask & inv_mask & code_mask].join(
             self.get_all_accounts()["crop"], on="account_guid", rsuffix="_acct"
         )
+        # Calculate the discounts using by getting inverse code matches
+        grain_invoice_list = invoices["inv_id"].to_list()
+        inverse_code_mask = ~all_inv["account_code"].str.match("133|134")
+        grain_mask = all_inv["inv_id"].isin(grain_invoice_list)
+        discounts = (
+            all_inv[grain_mask & inverse_code_mask & inv_mask][["inv_id", "amount"]]
+            .groupby(["inv_id"])
+            .sum(numeric_only=True)
+            .rename(columns={"amount": "discount_amt"})
+        )
+
+        # Group Grain Invoices
         grain = invoices.groupby(
             [
                 "date_posted",
@@ -1552,25 +1592,35 @@ class GnuCash_Data_Analysis:
                 "post_lot",
             ]
         ).sum(numeric_only=True)
-        grain["Price"] = grain["amount"] / grain["quantity"]
+
+        # Add the discounts
+        grain = grain.join(discounts["discount_amt"], on="inv_id").fillna(0)
+        grain["Price"] = round(grain["amount"] / grain["quantity"], 2)
         # 2024-09-13 added payment status
         payment_query = self.pdw.read_sql_file("sql/payments.sql")
         payments = self.pdw.df_fetch(payment_query).groupby("lot_guid").sum()
         grain = grain.join(payments, on="post_lot")
-        grain["paid"] = round(grain["amount"], 2) == abs(round(grain["payment_amt"], 2))
-        grain.drop(columns=["payment_amt"], inplace=True)
-        return grain.reset_index().rename(
-            columns={
-                "date_posted": "Contract Date",
-                "due_date": "Delivery Date",
-                "inv_id": "Invoice",
-                "crop": "Crop",
-                "org_name": "Elevator",
-                "quantity": "Bushels",
-                "amount": "Amount",
-                "paid": "Fulfilled",
-                "account_code": "Code",
-            }
+        grain["paid"] = round(grain["amount"] + grain["discount_amt"], 2) == abs(
+            round(grain["payment_amt"], 2)
+        )
+        # grain["paid"] = abs(round(grain["payment_amt"], 2))
+        # grain["settlement"] = grain["amount"] + grain["discount_amt"]
+        return (
+            grain.reset_index()
+            .drop(columns=["payment_amt", "post_lot", "account_code", "discount_amt"])
+            .rename(
+                columns={
+                    "date_posted": "Contract Date",
+                    "due_date": "Delivery Date",
+                    "inv_id": "Invoice",
+                    "crop": "Crop",
+                    "org_name": "Elevator",
+                    "quantity": "Bushels",
+                    "amount": "Amount",
+                    "paid": "Fulfilled",
+                    # "account_code": "Code",
+                }
+            )
         )
 
     def get_config(self):
@@ -1640,8 +1690,3 @@ class GnuCash_Data_Analysis:
         log.warning(" -- We balance, right? ----------------- {}".format(sanity))
         log.warning("Difference = {}".format(round(net - ending_chk_bal, 2)))
         return sanity
-
-gda = GnuCash_Data_Analysis()
-gda.year = 2024
-
-gda.get_farm_cash_transactions()
