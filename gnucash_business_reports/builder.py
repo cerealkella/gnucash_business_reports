@@ -1618,6 +1618,7 @@ class GnuCash_Data_Analysis:
                     "quantity": "Bushels",
                     "amount": "Amount",
                     "paid": "Fulfilled",
+                    "account_code": "Post Acct"
                     # "account_code": "Code",
                 }
             )
