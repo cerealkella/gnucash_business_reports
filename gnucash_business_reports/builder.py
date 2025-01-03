@@ -1612,13 +1612,13 @@ class GnuCash_Data_Analysis:
                 columns={
                     "date_posted": "Contract Date",
                     "due_date": "Delivery Date",
-                    "inv_id": "Invoice",
+                    "inv_id": "Contract ID",
                     "crop": "Crop",
                     "org_name": "Elevator",
                     "quantity": "Bushels",
                     "amount": "Amount",
                     "paid": "Fulfilled",
-                    "account_code": "Post Acct"
+                    "account_name": "Post Acct",
                     # "account_code": "Code",
                 }
             )
