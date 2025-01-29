@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 
-filename = "Chase9743_Activity20240626_20240725_20240821.CSV"
+filename = "Chase9743_Activity20241126_20241225_20250114.CSV"
 file_to_scrub = Path.joinpath(Path.home(), "Downloads", filename)
 # file_to_scrub = Path(f"$HOME/Downloads/{filename}")
 new_string = file_to_scrub.read_text()
@@ -24,6 +24,7 @@ new_string = new_string.replace(
     "Columbia Sportswear US,Shopping,", "Columbia Sportswear US,Clothing,"
 )
 new_string = new_string.replace("USPS PO 2687300672,Shopping,", "USPS,Shipping,")
+new_string = new_string.replace("THRIFTY WHITE PHARM 774,Health & Wellness,", "Thrifty White,Pharmacy,")
 
 
 scrubbed_file = Path.joinpath(Path.home(), "Downloads", f"scrubbed-{filename}")
