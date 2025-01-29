@@ -36,6 +36,7 @@ taxable = "string"
 taxincluded = "string"
 taxtable = "string"
 entry_type = "string"
+linked_document = "string"
 *pandas*/
 
 select
@@ -75,7 +76,8 @@ select
 	entries.b_taxtable as taxtable,
 	entries.action as entry_type,
 	entries."date" as entry_date,
-	tx_due.due_date as due_date
+	tx_due.due_date as due_date,
+	assoc_uri.linked_document as linked_document
 from
 	entries
 join accounts on
@@ -111,6 +113,15 @@ left join (
 	WHERE
 		slots.name = 'trans-date-due') as tx_due on
 	tx_due.obj_guid = invoices.post_txn
+left join (
+	select
+		slots.string_val as linked_document,
+		slots.obj_guid
+	from
+		slots
+	WHERE
+		slots.name = 'assoc_uri') as assoc_uri on
+	assoc_uri.obj_guid = invoices.guid
 union select
 	/* invoices */
 	'INVOICE' as inv_type,
@@ -148,7 +159,8 @@ union select
 	entries.i_taxtable as taxtable,
 	entries.action as entry_type,
 	entries."date" as entry_date,
-	tx_due.due_date as due_date
+	tx_due.due_date as due_date,
+	assoc_uri.linked_document as linked_document
 from
 	entries
 join accounts on
@@ -176,3 +188,12 @@ left join (
 	WHERE
 		slots.name = 'trans-date-due') as tx_due on
 	tx_due.obj_guid = invoices.post_txn
+left join (
+	select
+		slots.string_val as linked_document,
+		slots.obj_guid
+	from
+		slots
+	WHERE
+		slots.name = 'assoc_uri') as assoc_uri on
+	assoc_uri.obj_guid = invoices.guid
