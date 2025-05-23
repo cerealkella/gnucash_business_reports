@@ -1383,6 +1383,7 @@ class GnuCash_Data_Analysis:
 
     def get_split_accounts(self, search_term: str) -> pd.Series:
         """Function to find split accounts for a given search term
+        refactored 2025-05-23 to handle renamed tree structure
 
         Args:
             search_term (str): search term used for filtering accounts
@@ -1392,9 +1393,13 @@ class GnuCash_Data_Analysis:
             pd.Series: returns a pandas series indexed by commodity_guid
         """
         self.get_all_accounts()
-        df = self.all_accounts.loc[
+        name_search = self.all_accounts.loc[
+            self.all_accounts["name"].str.contains(search_term)
+        ]
+        parent_search = self.all_accounts.loc[
             self.all_accounts["parent_accounts"].str.contains(search_term)
         ]
+        df = pd.concat([name_search, parent_search])
         return df.reset_index().set_index("commodity_guid")["guid"]
 
     def process_elevator_load_file(self) -> pd.DataFrame:
