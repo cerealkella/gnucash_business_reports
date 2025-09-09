@@ -1583,7 +1583,6 @@ class GnuCash_Data_Analysis:
             .sum(numeric_only=True)
             .rename(columns={"amount": "discount_amt"})
         )
-
         # Group Grain Invoices
         grain = invoices.groupby(
             [
@@ -1605,9 +1604,9 @@ class GnuCash_Data_Analysis:
         payment_query = self.pdw.read_sql_file("sql/payments.sql")
         payments = self.pdw.df_fetch(payment_query).groupby("lot_guid").sum()
         grain = grain.join(payments, on="post_lot")
-        grain["paid"] = round(grain["amount"] + grain["discount_amt"], 2) == abs(
-            round(grain["payment_amt"], 2)
-        )
+        grain["paid"] = abs(grain["amount"] 
+                            + grain["discount_amt"] 
+                            + grain["payment_amt"]) <= 0.02
         # grain["paid"] = abs(round(grain["payment_amt"], 2))
         # grain["settlement"] = grain["amount"] + grain["discount_amt"]
         return (
