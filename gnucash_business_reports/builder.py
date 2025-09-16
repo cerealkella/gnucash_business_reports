@@ -1586,6 +1586,7 @@ class GnuCash_Data_Analysis:
         # Group Grain Invoices
         grain = invoices.groupby(
             [
+                "date_opened",
                 "date_posted",
                 "due_date",
                 "inv_id",
@@ -1614,8 +1615,9 @@ class GnuCash_Data_Analysis:
             .drop(columns=["payment_amt", "post_lot", "account_code", "discount_amt"])
             .rename(
                 columns={
-                    "date_posted": "Contract Date",
-                    "due_date": "Delivery Date",
+                    "date_opened": "Contract Date",
+                    "date_posted": "Delivery Start",
+                    "due_date": "Delivery End",
                     "inv_id": "Contract ID",
                     "crop": "Crop",
                     "org_name": "Elevator",
