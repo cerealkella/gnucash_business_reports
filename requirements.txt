@@ -5,6 +5,7 @@ bleach>=3.1.5
 decorator>=4.4.2
 defusedxml>=0.6.0
 entrypoints>=0.3
+great_tables>=0.18.0
 ipykernel>=5.2.1
 ipython>=7.14.0
 ipython-genutils>=0.2.0
