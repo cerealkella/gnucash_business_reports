@@ -9,22 +9,24 @@ from .logger import log
 
 
 options = Options()
-options.add_argument('--headless=new')
+# options.add_argument('--headless=new')
 
 class Production:
     config = get_config()["Production"]
     driver = webdriver.Chrome(options=options)  # Or Firefox(), or Ie(), or Opera()
     driver.get(config["webpage"])
+    log.info(config["webpage"])
+    log.info(config["username"])
 
     def __init__(self):
         time.sleep(8)
         # Find username and password elements
-        username = self.driver.find_element(By.ID, "idp-discovery-username")
+        username = self.driver.find_element(By.ID, "input28")
         # Log in
         username.send_keys(self.config["username"])
         username.submit()
         time.sleep(5)
-        password = self.driver.find_element(By.ID, "okta-signin-password")
+        password = self.driver.find_element(By.ID, "input54")
         password.send_keys(keyring.get_password("production", self.config["username"]))
         password.submit()
         log.info("Logged in!")
