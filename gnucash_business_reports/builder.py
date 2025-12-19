@@ -215,6 +215,8 @@ class GnuCash_Data_Analysis:
         Args:
             how (str, optional): Aggregation method - how to aggregate
             the dataframe. last or mean are common. Defaults to "mean".
+            If None is passed, the function will return an un-aggregated
+            dataframe
 
         Returns:
             pd.DataFrame: small df with the grouped and aggregated bids
@@ -239,13 +241,20 @@ class GnuCash_Data_Analysis:
                 "quote_tz",
             ]
         )
-        return (
-            bids.sort_values("date")
-            .groupby(["commodity_guid", "fullname", "currency_guid"])
-            .agg(how, numeric_only=True)
-            .reset_index()
-            .rename(columns={"fullname": "crop"})
-        )
+        if how is None:
+            return (
+                    bids.sort_values("date")
+                    .reset_index()
+                    .rename(columns={"fullname": "crop"})
+            )
+        else:
+            return (
+                bids.sort_values("date")
+                .groupby(["commodity_guid", "fullname", "currency_guid"])
+                .agg(how, numeric_only=True)
+                .reset_index()
+                .rename(columns={"fullname": "crop"})
+            )
 
     def build_depreciation_dataframe(self) -> pd.DataFrame:
         """Builds depreciation schedule
