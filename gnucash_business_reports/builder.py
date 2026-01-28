@@ -833,7 +833,7 @@ class GnuCash_Data_Analysis:
             self.get_farm_cash_transactions(include_depreciation=include_depreciation)
             .sort_values("account_code")
             .groupby(groupby)
-            .sum(["quantity", "amt"])
+            .sum(numeric_only=True)
             .reset_index()
         )
 
@@ -983,7 +983,7 @@ class GnuCash_Data_Analysis:
             2,
         )
         business_expenses.to_csv(f"export/{self.year}-personal-farm-expenses.csv")
-        return business_expenses.groupby("Acct").sum(["Amt", "Deduct_Total"])
+        return business_expenses.groupby("Acct").sum(numeric_only=True)
 
     def get_1099_personal_vendors(self):
         dates = {
