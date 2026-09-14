@@ -1353,7 +1353,8 @@ class GnuCash_Data_Analysis:
         df = pd.read_csv(
             self.load_file,
             parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
-            date_format="%m/%d/%y %H:%M:%S",
+            # date_format="%m/%d/%y %H:%M:%S",
+            date_format="%Y-%m-%dT%H:%M:%S"
         )
         df.columns = df.columns.str.strip()
         log.info(df.head())
@@ -1612,13 +1613,13 @@ class GnuCash_Data_Analysis:
         grain["Price"] = round(grain["amount"] / grain["quantity"], 2)
         # 2024-09-13 added payment status
         payment_query = self.pdw.read_sql_file("sql/payments.sql")
-        payments = self.pdw.df_fetch(payment_query).groupby("lot_guid").sum()
-        grain = grain.join(payments, on="post_lot")
+        payments = self.pdw.df_fetch(payment_query).groupby("invoice_id").sum()
+        grain = grain.join(payments, on="inv_id")
         grain["paid"] = abs(grain["amount"] 
                             + grain["discount_amt"] 
                             + grain["payment_amt"]) <= 0.02
-        # grain["paid"] = abs(round(grain["payment_amt"], 2))
-        # grain["settlement"] = grain["amount"] + grain["discount_amt"]
+        # grain["Fulfilled"] = abs(round(grain["payment_amt"], 2))
+        # grain["settlement_amt"] = grain["amount"] + grain["discount_amt"]
         return (
             grain.reset_index()
             .drop(columns=["payment_amt", "post_lot", "account_code", "discount_amt"])
