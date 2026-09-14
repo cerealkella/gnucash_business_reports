@@ -156,7 +156,7 @@ def grain_invoices(gda):
 
 
 gda = GnuCash_Data_Analysis()
-gda.year = 2025
+gda.year = 2026
 
 # build_report(gda)
 production_data(gda)
