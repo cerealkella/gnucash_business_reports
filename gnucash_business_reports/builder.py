@@ -586,8 +586,12 @@ class GnuCash_Data_Analysis:
         Returns:
             pd.DataFrame: dataframe with grain values
         """
+        stock = self.get_stock()
+        # Remove deduction transactions
+        stock = stock[~stock["src_name"]\
+            .isin(["Basis", "Hedging", "Checkoff", "Marketing", "Storage"])]
         df = (
-            self.add_descriptor_column(self.get_stock(), "parent_accounts")
+            self.add_descriptor_column(stock, "parent_accounts")
             .groupby(groupby)
             .sum(numeric_only=True)
             .join(self.get_commodity_bids(how="last").set_index("commodity_guid"))
