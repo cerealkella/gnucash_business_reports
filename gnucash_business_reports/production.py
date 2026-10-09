@@ -33,6 +33,7 @@ class Production:
         time.sleep(10)
 
     def get_production_report(self):
+        self.driver.maximize_window()
         self.driver.get(self.config["reports"])
         log.info("Loading reports module (30 seconds)...")
         time.sleep(30)
