@@ -49,6 +49,7 @@ username = "myJDusername"
 joplin_db = "/home/user/.config/joplin-desktop/database.sqlite"
 joplin_uri_prefix = "joplin://x-callback-url/openNote?id="
 joplin_api_token = "biglongstring0fl3ttersandNumb3rs"
+joplin_default_folder = "anotherlongguidstring"
 
 # Excel Formatting
 # used to create nice clean looking Excel Spreadsheets
