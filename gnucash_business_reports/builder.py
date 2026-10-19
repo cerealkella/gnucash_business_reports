@@ -1356,9 +1356,11 @@ class GnuCash_Data_Analysis:
         self.elevator = get_config()["Elevator"]
         df = pd.read_csv(
             self.load_file,
-            parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
+            parse_dates=["Tare Time Stamp"],
+            date_format="%Y-%m-%d %H:%M:%S",
+            # parse_dates=[" Tare Time Stamp", " Gross Time Stamp"],
             # date_format="%m/%d/%y %H:%M:%S",
-            date_format="%Y-%m-%dT%H:%M:%S"
+            # date_format="%Y-%m-%dT%H:%M:%S"
         )
         df.columns = df.columns.str.strip()
         log.info(df.head())
