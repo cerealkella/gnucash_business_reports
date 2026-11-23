@@ -509,6 +509,8 @@ class GnuCash_Data_Analysis:
                 else:
                     if not tx.empty:
                         all_tx = pd.concat([all_tx, tx])
+            cols_to_convert = ["amt", "qty"]
+            all_tx[cols_to_convert] = all_tx[cols_to_convert].apply(pd.to_numeric, errors='coerce')
             return all_tx
 
         for account in acct_types:
@@ -549,7 +551,7 @@ class GnuCash_Data_Analysis:
             pd.Dataframe: dataframe containing cash transactions
         """
         return self.filter_by_year(
-            self.fetch_transactions(["BANK", "CASH"], True), "post_date", True
+            self.fetch_transactions(["BANK", "CASH", "RECEIVABLE"], True), "post_date", True
         )
 
     def get_liabilities(self) -> pd.DataFrame:
@@ -1165,7 +1167,9 @@ class GnuCash_Data_Analysis:
             .round(2)
         )
 
-    def get_production(self, include_operation_id=True) -> pd.DataFrame:
+    def get_production(self, 
+            include_operation_id=True,
+            rename_columns=False) -> pd.DataFrame:
         """pulls production per field
 
         Returns:
@@ -1196,7 +1200,19 @@ class GnuCash_Data_Analysis:
             )
         )
 
-        df["bu_per_acre"] = round(df["total_bushels"] / df["acres"], 2)
+        if rename_columns:
+            df = df.reset_index().rename(columns=
+                {
+                    "operation": "Farm",
+                    "crop": "Crop",
+                    "total_bushels": "Total Bushels",
+                    "acres": "Acres",
+                    "bu_per_acre": "Bu/Acre"
+                }).set_index(["Crop", "Farm"])
+            df["Bu/Acre"] = round(df["Total Bushels"] / df["Acres"], 2)
+            return df
+        else:
+            df["bu_per_acre"] = round(df["total_bushels"] / df["acres"], 2)
         return df
 
     def flexible_lease_calculator(self) -> pd.DataFrame:
